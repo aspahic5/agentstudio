@@ -1,0 +1,11 @@
+/**
+ * Redis client singleton — used for session snapshot caching.
+ */
+
+import Redis from 'ioredis';
+import { config } from '../config.js';
+
+export const redis = new Redis(config.REDIS_URL, {
+  maxRetriesPerRequest: 3,
+  lazyConnect: true,
+});
