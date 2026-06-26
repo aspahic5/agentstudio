@@ -3,6 +3,9 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { config } from './config.js';
 import authRoutes from './routes/auth.js';
+import agentRoutes from './routes/agents.js';
+import toolRoutes from './routes/tools.js';
+import sessionRoutes from './routes/sessions.js';
 import mcpPlugin from './mcp/plugin.js';
 
 const app = Fastify({
@@ -21,6 +24,9 @@ app.get('/health', async () => {
 });
 
 await app.register(authRoutes, { prefix: '/api/auth' });
+await app.register(agentRoutes, { prefix: '/api/agents' });
+await app.register(toolRoutes, { prefix: '/api/tools' });
+await app.register(sessionRoutes, { prefix: '/api' });
 await app.register(mcpPlugin);
 
 try {

@@ -4,6 +4,7 @@ import { hashPassword, verifyPassword } from '../auth/password.js';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../auth/jwt.js';
 import { userRepository, hashRefreshToken } from '../repositories/UserRepository.js';
 import { authenticate } from '../auth/middleware.js';
+import { parseBody } from '../validation.js';
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -19,15 +20,6 @@ const loginSchema = z.object({
 const refreshSchema = z.object({
   refreshToken: z.string(),
 });
-
-function parseBody<T>(schema: z.ZodType<T>, body: unknown): T {
-  const result = schema.safeParse(body);
-  if (!result.success) {
-    const issues = result.error.issues.map(i => i.message).join(', ');
-    throw { statusCode: 400, message: `Validation error: ${issues}` };
-  }
-  return result.data;
-}
 
 async function generateTokens(user: { id: string; email: string; role: string }) {
   const accessToken = await signAccessToken({ sub: user.id, email: user.email, role: user.role });
