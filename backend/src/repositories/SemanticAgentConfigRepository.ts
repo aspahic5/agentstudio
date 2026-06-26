@@ -36,6 +36,16 @@ export class SemanticAgentConfigRepository {
     await target.insert(semanticAgentConfigs).values(configs);
   }
 
+  async findByNode(agentId: string, version: string, nodeId: string) {
+    return db.query.semanticAgentConfigs.findFirst({
+      where: and(
+        eq(semanticAgentConfigs.agentId, agentId),
+        eq(semanticAgentConfigs.version, version),
+        eq(semanticAgentConfigs.nodeId, nodeId),
+      ),
+    });
+  }
+
   async deleteByAgentVersion(agentId: string, version: string, tx?: Tx) {
     const target = tx ?? db;
     await target.delete(semanticAgentConfigs).where(
