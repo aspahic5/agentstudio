@@ -155,6 +155,14 @@ export class VersionRepository {
     }
   }
 
+  private requireMapping(map: Map<string, string>, key: string, field: string): string {
+    const mapped = map.get(key);
+    if (!mapped) {
+      throw { statusCode: 400, message: `Invalid ${field}: referenced ID "${key}" not found in payload` };
+    }
+    return mapped;
+  }
+
   private buildIdMaps(nodes: NodePayload[], saConfigs: SaConfigPayload[]) {
     const nodeIdMap = new Map<string, string>();
     for (const n of nodes) nodeIdMap.set(n.id, crypto.randomUUID());
@@ -176,7 +184,7 @@ export class VersionRepository {
       name: n.name,
       nodeType: n.nodeType,
       semanticAgentConfigId: n.semanticAgentConfigId
-        ? (configIdMap.get(n.semanticAgentConfigId) ?? n.semanticAgentConfigId)
+        ? this.requireMapping(configIdMap, n.semanticAgentConfigId, 'semanticAgentConfigId')
         : null,
       phaseLabel: n.phaseLabel,
       progressWeight: n.progressWeight,
@@ -194,7 +202,7 @@ export class VersionRepository {
       id: configIdMap.get(c.id)!,
       agentId,
       version,
-      nodeId: nodeIdMap.get(c.nodeId) ?? c.nodeId,
+      nodeId: this.requireMapping(nodeIdMap, c.nodeId, 'nodeId'),
       name: c.name,
       systemPrompt: c.systemPrompt,
       outputSchemaJson: c.outputSchemaJson,

@@ -9,15 +9,29 @@ import sessionRoutes from './routes/sessions.js';
 import mcpPlugin from './mcp/plugin.js';
 
 const app = Fastify({
-  logger: {
-    transport: {
-      target: 'pino-pretty',
-      options: { colorize: true },
-    },
-  },
+  logger: process.env.NODE_ENV === 'production'
+    ? true
+    : {
+        transport: {
+          target: 'pino-pretty',
+          options: { colorize: true },
+        },
+      },
 });
 
-await app.register(cors, { origin: true });
+app.setErrorHandler((error: unknown, request, reply) => {
+  const err = error as { statusCode?: number; message?: string };
+  if (err.statusCode && err.statusCode >= 400 && err.statusCode < 500) {
+    reply.code(err.statusCode).send({ error: err.message ?? 'Request error' });
+  } else {
+    request.log.error(error);
+    reply.code(500).send({ error: 'Internal server error' });
+  }
+});
+
+await app.register(cors, {
+  origin: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : true,
+});
 
 app.get('/health', async () => {
   return { status: 'ok', timestamp: new Date().toISOString() };

@@ -26,5 +26,6 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
 export async function requireAdmin(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   if (request.user.role !== 'admin') {
     reply.code(403).send({ error: 'Admin access required' });
+    return;
   }
 }

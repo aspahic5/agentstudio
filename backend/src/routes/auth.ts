@@ -34,13 +34,16 @@ export default async function authRoutes(app: FastifyInstance) {
   app.post('/register', async (request, reply) => {
     const body = parseBody(registerSchema, request.body);
 
-    const existing = await userRepository.findByEmail(body.email);
-    if (existing) {
-      return reply.code(409).send({ error: 'Email already registered' });
-    }
-
     const passwordHash = await hashPassword(body.password);
-    const user = await userRepository.create({ email: body.email, name: body.name, passwordHash });
+    let user;
+    try {
+      user = await userRepository.create({ email: body.email, name: body.name, passwordHash });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.includes('users_email_unique')) {
+        return reply.code(409).send({ error: 'Email already registered' });
+      }
+      throw err;
+    }
     const tokens = await generateTokens(user);
 
     return reply.code(201).send({
@@ -54,6 +57,7 @@ export default async function authRoutes(app: FastifyInstance) {
 
     const user = await userRepository.findByEmail(body.email);
     if (!user) {
+      await hashPassword(body.password);
       return reply.code(401).send({ error: 'Invalid credentials' });
     }
 

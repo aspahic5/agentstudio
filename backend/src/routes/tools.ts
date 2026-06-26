@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import Ajv from 'ajv';
 import { parseBody } from '../validation.js';
-import { authenticate } from '../auth/middleware.js';
+import { authenticate, requireAdmin } from '../auth/middleware.js';
 import { toolDefinitionRepository } from '../repositories/ToolDefinitionRepository.js';
 
 const ajv = new Ajv({ addUsedSchema: false });
@@ -47,7 +47,7 @@ export default async function toolRoutes(app: FastifyInstance) {
     return toolDefinitionRepository.list();
   });
 
-  app.post('/', async (request, reply) => {
+  app.post('/', { onRequest: [requireAdmin] }, async (request, reply) => {
     const body = parseBody(createToolSchema, request.body);
     if (body.parametersSchemaJson !== undefined) {
       validateParametersSchema(body.parametersSchemaJson);
@@ -56,7 +56,7 @@ export default async function toolRoutes(app: FastifyInstance) {
     return reply.code(201).send(tool);
   });
 
-  app.put('/:toolId', async (request, reply) => {
+  app.put('/:toolId', { onRequest: [requireAdmin] }, async (request, reply) => {
     const { toolId } = request.params as { toolId: string };
     const body = parseBody(updateToolSchema, request.body);
     const existing = await toolDefinitionRepository.findById(toolId);
@@ -67,7 +67,7 @@ export default async function toolRoutes(app: FastifyInstance) {
     return toolDefinitionRepository.update(toolId, body);
   });
 
-  app.delete('/:toolId', async (request, reply) => {
+  app.delete('/:toolId', { onRequest: [requireAdmin] }, async (request, reply) => {
     const { toolId } = request.params as { toolId: string };
     const existing = await toolDefinitionRepository.findById(toolId);
     if (!existing) return reply.code(404).send({ error: 'Tool not found' });

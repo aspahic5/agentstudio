@@ -41,7 +41,7 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
     algorithms: ['HS256'],
   });
   if (payload.type === 'refresh') {
-    throw new Error('Refresh token cannot be used as access token');
+    throw { statusCode: 401, message: 'Invalid or expired token' };
   }
   return {
     sub: payload.sub!,
@@ -57,7 +57,7 @@ export async function verifyRefreshToken(token: string): Promise<RefreshTokenPay
     algorithms: ['HS256'],
   });
   if (payload.type !== 'refresh') {
-    throw new Error('Not a refresh token');
+    throw { statusCode: 401, message: 'Invalid refresh token' };
   }
   return { sub: payload.sub!, type: 'refresh' };
 }
