@@ -392,7 +392,7 @@ export interface LoopDetector {
 // ============================================================================
 
 export type ContextWindowSummarizer = (
-  turns: ConversationTurn[],
+  text: string,
   strategy: 'summarize' | 'key_points'
 ) => Promise<string>;
 
@@ -402,6 +402,7 @@ export type ContextWindowSummarizer = (
 
 export interface ExecutorDependencies {
   agentFactory: SemanticAgentFactory;
+  agentVersion: string;
   logger: FastifyBaseLogger;
   templateEnv: Record<string, string>;
   credentials: Record<string, string>;
