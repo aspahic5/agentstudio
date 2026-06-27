@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { db } from '../db/drizzle.js';
 import { toolDefinitions } from '../db/schema.js';
 
@@ -9,6 +9,13 @@ export class ToolDefinitionRepository {
 
   async findById(id: string) {
     return db.query.toolDefinitions.findFirst({ where: eq(toolDefinitions.id, id) });
+  }
+
+  async findByNames(names: string[]) {
+    if (names.length === 0) return [];
+    return db.query.toolDefinitions.findMany({
+      where: inArray(toolDefinitions.name, names),
+    });
   }
 
   async create(data: {
