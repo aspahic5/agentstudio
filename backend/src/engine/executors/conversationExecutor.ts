@@ -202,7 +202,7 @@ export class ConversationExecutorImpl implements IConversationExecutor {
     if (node.contextDigest && deps.contextDigester) {
       flatContext = await deps.contextDigester(flatContext, node.contextDigest);
     }
-    flatContext = {
+    const toolDispatchContext: Record<string, unknown> = {
       ...flatContext,
       env: deps.templateEnv,
       credentials: buildNodeCredentials(node.id, node.requiredCredentials, deps.credentials),
@@ -335,7 +335,7 @@ export class ConversationExecutorImpl implements IConversationExecutor {
         yield buildThinkingChunk(`Using cached result for ${stepOutput.toolName}...`);
       } else {
         yield buildThinkingChunk(`Calling ${stepOutput.toolName}...`);
-        result = await dispatch(stepOutput.toolName, stepOutput.parameters, toolDefMap, flatContext);
+        result = await dispatch(stepOutput.toolName, stepOutput.parameters, toolDefMap, toolDispatchContext);
         toolCallCache.set(cacheKey, result);
       }
 

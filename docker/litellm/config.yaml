@@ -1,17 +1,17 @@
 model_list:
   - model_name: gemini-3-pro
     litellm_params:
-      model: gemini/gemini-3-pro-preview
+      model: gemini/gemini-3.1-pro-preview
       api_key: os.environ/GEMINI_API_KEY
 
   - model_name: gemini-3-flash
     litellm_params:
-      model: gemini/gemini-3-flash-preview
+      model: gemini/gemini-3.1-flash-lite-preview
       api_key: os.environ/GEMINI_API_KEY
 
   - model_name: studio-editor
     litellm_params:
-      model: gemini/gemini-3-pro-preview
+      model: gemini/gemini-3.1-pro-preview
       api_key: os.environ/GEMINI_API_KEY
 
 litellm_settings:

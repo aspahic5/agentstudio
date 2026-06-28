@@ -97,7 +97,7 @@ export class AgenticExecutorImpl implements IAgenticExecutor {
     if (node.contextDigest && deps.contextDigester) {
       flatContext = await deps.contextDigester(flatContext, node.contextDigest);
     }
-    flatContext = {
+    const toolDispatchContext: Record<string, unknown> = {
       ...flatContext,
       env: deps.templateEnv,
       credentials: buildNodeCredentials(node.id, node.requiredCredentials, deps.credentials),
@@ -189,7 +189,7 @@ export class AgenticExecutorImpl implements IAgenticExecutor {
         yield buildThinkingChunk(`Using cached result for ${stepOutput.toolName}...`);
       } else {
         yield buildThinkingChunk(`Calling ${stepOutput.toolName}...`);
-        result = await dispatch(stepOutput.toolName, stepOutput.parameters, toolDefMap, flatContext);
+        result = await dispatch(stepOutput.toolName, stepOutput.parameters, toolDefMap, toolDispatchContext);
         toolCallCache.set(cacheKey, result);
       }
 

@@ -5,6 +5,25 @@ import { ApplicationError, TimeoutError } from './errors.js';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
+const PRIVATE_IP_PATTERNS = [
+  /^127\./,
+  /^10\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^192\.168\./,
+  /^169\.254\./,
+  /^0\./,
+  /^::1$/,
+  /^fc00:/i,
+  /^fd/i,
+  /^fe80:/i,
+];
+
+function isPrivateHost(hostname: string): boolean {
+  if (hostname === 'localhost' || hostname === '[::1]') return true;
+  const bare = hostname.replace(/^\[|\]$/g, '');
+  return PRIVATE_IP_PATTERNS.some((re) => re.test(bare));
+}
+
 export async function executeHttpToolCall(
   toolDef: ToolDefinition,
   interpolationContext: Record<string, unknown>,
@@ -12,21 +31,27 @@ export async function executeHttpToolCall(
 ): Promise<unknown> {
   let url = interpolate(toolDef.urlTemplate, interpolationContext);
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    const isLocalInstance = url.includes('localhost') || url.includes('127.0.0.1');
-    url = isLocalInstance ? `http://${url}` : `https://${url}`;
+    url = `https://${url}`;
   }
 
+  let parsed: URL;
   try {
-    const parsed = new URL(url);
+    parsed = new URL(url);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
       throw new ApplicationError(`Disallowed protocol: ${parsed.protocol}`, { code: 'VALIDATION_ERROR', statusCode: 400, context: { toolName, protocol: parsed.protocol } });
     }
   } catch (error) {
     if (error instanceof ApplicationError) throw error;
     throw new ApplicationError(
-      `Tool "${toolName}" has invalid URL after interpolation: "${url.slice(0, 200)}". ` +
-      `${error instanceof Error ? error.message : String(error)}`,
-      { code: 'VALIDATION_ERROR', statusCode: 400, context: { toolName, url: url.slice(0, 200) }, cause: error instanceof Error ? error : undefined }
+      `Tool "${toolName}" has invalid URL after interpolation`,
+      { code: 'VALIDATION_ERROR', statusCode: 400, context: { toolName }, cause: error instanceof Error ? error : undefined }
+    );
+  }
+
+  if (isPrivateHost(parsed.hostname)) {
+    throw new ApplicationError(
+      `Tool "${toolName}" attempted to access a private/internal address`,
+      { code: 'VALIDATION_ERROR', statusCode: 400, context: { toolName } }
     );
   }
 
@@ -59,9 +84,8 @@ export async function executeHttpToolCall(
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
       throw new ApplicationError(
-        `Tool "${toolName}" HTTP error: ${response.status} ${response.statusText}. ` +
-        `URL: ${url}. Response: ${errorText.slice(0, 500)}`,
-        { code: 'AGENT_ERROR', context: { toolName, statusCode: response.status, url } }
+        `Tool "${toolName}" HTTP error: ${response.status} ${response.statusText}`,
+        { code: 'AGENT_ERROR', context: { toolName, statusCode: response.status } }
       );
     }
 
@@ -101,8 +125,8 @@ export async function executeHttpToolCall(
     clearTimeout(timeoutId);
     if (error instanceof Error && error.name === 'AbortError') {
       throw new TimeoutError(
-        `Tool "${toolName}" timed out after ${DEFAULT_TIMEOUT_MS}ms. URL: ${url}`,
-        { context: { toolName, timeoutMs: DEFAULT_TIMEOUT_MS, url } }
+        `Tool "${toolName}" timed out after ${DEFAULT_TIMEOUT_MS}ms`,
+        { context: { toolName, timeoutMs: DEFAULT_TIMEOUT_MS } }
       );
     }
     throw error;

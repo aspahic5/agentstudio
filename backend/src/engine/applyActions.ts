@@ -6,6 +6,17 @@ import { ApplicationError } from './errors.js';
 
 const ajv = new Ajv({ allErrors: true });
 
+const BLOCKED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function assertSafeKey(key: string): void {
+  if (BLOCKED_KEYS.has(key)) {
+    throw new ApplicationError(
+      `[applyActions] Blocked dangerous key: "${key}"`,
+      { code: 'VALIDATION_ERROR', statusCode: 400, context: { key } }
+    );
+  }
+}
+
 export function buildInterpolationContext(
   context: ConversationContext
 ): Record<string, unknown> {
@@ -27,10 +38,12 @@ export function applyActions(
   const updates: Record<string, unknown> = {};
   for (const action of actions) {
     if (action.type === 'set_context') {
+      assertSafeKey(action.key);
       updates[action.key] = typeof action.value === 'string'
         ? interpolate(action.value, flatContext)
         : action.value;
     } else if (action.type === 'increment_context') {
+      assertSafeKey(action.key);
       const increment = Number(action.value);
       if (Number.isNaN(increment)) {
         throw new ApplicationError(
@@ -72,6 +85,9 @@ export function extractPath(obj: unknown, path: string): unknown {
 
 export function setPath(obj: unknown, path: string, value: unknown): void {
   const parts = path.split('.');
+  for (const part of parts) {
+    assertSafeKey(part);
+  }
   let current: unknown = obj;
   for (let i = 0; i < parts.length - 1; i++) {
     if (current === null || current === undefined || typeof current !== 'object') {

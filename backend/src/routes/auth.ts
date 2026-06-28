@@ -39,7 +39,8 @@ export default async function authRoutes(app: FastifyInstance) {
     try {
       user = await userRepository.create({ email: body.email, name: body.name, passwordHash });
     } catch (err: unknown) {
-      if (err instanceof Error && err.message.includes('users_email_unique')) {
+      const code = (err as { cause?: { code?: string } }).cause?.code;
+      if (code === '23505') {
         return reply.code(409).send({ error: 'Email already registered' });
       }
       throw err;

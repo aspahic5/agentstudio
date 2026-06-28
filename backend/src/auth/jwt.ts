@@ -31,6 +31,7 @@ export async function signRefreshToken(payload: RefreshTokenPayload): Promise<st
     .setSubject(payload.sub)
     .setIssuer(ISSUER)
     .setIssuedAt()
+    .setJti(crypto.randomUUID())
     .setExpirationTime('7d')
     .sign(secretKey);
 }

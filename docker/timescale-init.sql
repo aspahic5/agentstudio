@@ -23,5 +23,6 @@ SELECT create_hypertable('session_messages', 'created_at', if_not_exists => TRUE
 CREATE INDEX IF NOT EXISTS idx_messages_session_created
   ON session_messages (session_id, created_at ASC);
 
--- Compress chunks older than 30 days
+-- Enable columnstore and compress chunks older than 30 days
+ALTER TABLE session_messages SET (timescaledb.compress);
 SELECT add_compression_policy('session_messages', INTERVAL '30 days', if_not_exists => TRUE);

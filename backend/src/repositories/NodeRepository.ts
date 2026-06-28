@@ -5,8 +5,9 @@ import { agentNodes } from '../db/schema.js';
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export class NodeRepository {
-  async findByAgentVersion(agentId: string, version: string) {
-    return db.query.agentNodes.findMany({
+  async findByAgentVersion(agentId: string, version: string, txOrDb: Tx | typeof db = db) {
+    const q = 'query' in txOrDb ? txOrDb : db;
+    return q.query.agentNodes.findMany({
       where: and(eq(agentNodes.agentId, agentId), eq(agentNodes.version, version)),
     });
   }

@@ -28,6 +28,7 @@ export const config = {
   REDIS_URL: requireEnv('REDIS_URL'),
   LITELLM_BASE_URL: requireEnv('LITELLM_BASE_URL'),
   JWT_SECRET: requireEnv('JWT_SECRET', 32),
+  CORS_ORIGINS: requireEnv('CORS_ORIGINS'),
   PORT: parseInt(optionalEnv('PORT', '3001'), 10),
   HOST: optionalEnv('HOST', '0.0.0.0'),
 } as const;

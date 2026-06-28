@@ -144,7 +144,7 @@ export default async function sessionRoutes(app: FastifyInstance) {
 
     const provider = new LiteLLMService({
       baseUrl: config.LITELLM_BASE_URL,
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-3-pro',
       logger: request.log,
     });
 
@@ -153,6 +153,9 @@ export default async function sessionRoutes(app: FastifyInstance) {
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
     });
+
+    const abortController = new AbortController();
+    request.raw.on('close', () => abortController.abort());
 
     try {
       const stream = processMessage(
@@ -169,15 +172,19 @@ export default async function sessionRoutes(app: FastifyInstance) {
       );
 
       for await (const chunk of stream) {
+        if (abortController.signal.aborted) break;
         reply.raw.write(`data: ${JSON.stringify(chunk)}\n\n`);
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
       request.log.error({ err }, '[Message] Engine error');
-      reply.raw.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
+      if (!abortController.signal.aborted) {
+        reply.raw.write(`data: ${JSON.stringify({ error: 'An internal error occurred' })}\n\n`);
+      }
     }
 
-    reply.raw.write('data: [DONE]\n\n');
+    if (!abortController.signal.aborted) {
+      reply.raw.write('data: [DONE]\n\n');
+    }
     reply.raw.end();
   });
 }

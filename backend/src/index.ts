@@ -30,7 +30,7 @@ app.setErrorHandler((error: unknown, request, reply) => {
 });
 
 await app.register(cors, {
-  origin: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : true,
+  origin: config.CORS_ORIGINS.split(','),
 });
 
 app.get('/health', async () => {

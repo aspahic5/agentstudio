@@ -79,12 +79,21 @@ export class VersionRepository {
           tx,
         );
 
+        // Remap initialNodeId if it matches a logical ID in this payload
+        const [agent] = await tx.select({ initialNodeId: agents.initialNodeId }).from(agents).where(eq(agents.id, agentId));
+        const remappedInitial = agent ? nodeIdMap.get(agent.initialNodeId) : undefined;
+
         await tx.update(agents)
-          .set({ currentVersion: version, updatedAt: new Date() })
+          .set({
+            currentVersion: version,
+            ...(remappedInitial && { initialNodeId: remappedInitial }),
+            updatedAt: new Date(),
+          })
           .where(eq(agents.id, agentId));
       });
     } catch (err: unknown) {
-      if (err instanceof Error && err.message.includes('uq_agent_versions_agent_version')) {
+      const code = (err as { cause?: { code?: string } }).cause?.code;
+      if (code === '23505') {
         throw { statusCode: 409, message: `Version ${version} already exists` };
       }
       throw err;
@@ -102,6 +111,10 @@ export class VersionRepository {
     await db.transaction(async (tx) => {
       await this.assertVersionExists(tx, agentId, version);
 
+      // Read old nodes + agent initialNodeId BEFORE deleting
+      const oldNodes = await nodeRepository.findByAgentVersion(agentId, version, tx);
+      const [agentRow] = await tx.select({ initialNodeId: agents.initialNodeId }).from(agents).where(eq(agents.id, agentId));
+
       await saConfigRepository.deleteByAgentVersion(agentId, version, tx);
       await nodeRepository.deleteByAgentVersion(agentId, version, tx);
 
@@ -114,6 +127,29 @@ export class VersionRepository {
         this.remapConfigs(saConfigs, agentId, version, nodeIdMap, configIdMap),
         tx,
       );
+
+      // Remap initialNodeId to new UUID
+      if (agentRow) {
+        let remappedInitial = nodeIdMap.get(agentRow.initialNodeId);
+
+        if (!remappedInitial) {
+          // initialNodeId is a UUID from a previous version — find the old node it
+          // pointed to, then match by nodeType to the corresponding new payload node
+          const oldInitial = oldNodes.find(n => n.id === agentRow.initialNodeId);
+          if (oldInitial) {
+            const matchingNew = nodes.find(n => n.nodeType === oldInitial.nodeType);
+            if (matchingNew) {
+              remappedInitial = nodeIdMap.get(matchingNew.id);
+            }
+          }
+        }
+
+        if (remappedInitial) {
+          await tx.update(agents)
+            .set({ initialNodeId: remappedInitial, updatedAt: new Date() })
+            .where(eq(agents.id, agentId));
+        }
+      }
     });
   }
 
@@ -188,10 +224,42 @@ export class VersionRepository {
         : null,
       phaseLabel: n.phaseLabel,
       progressWeight: n.progressWeight,
-      configJson: n.configJson,
+      configJson: this.remapConfigJson(n.configJson, nodeIdMap),
       positionX: n.positionX,
       positionY: n.positionY,
     }));
+  }
+
+  private remapConfigJson(configJson: unknown, nodeIdMap: Map<string, string>): unknown {
+    if (!configJson || typeof configJson !== 'object') return configJson;
+    const cfg = configJson as Record<string, unknown>;
+    const out = { ...cfg };
+
+    // Remap targetNodeId (generation, tool, agentic, compute, conversation)
+    if (typeof out.targetNodeId === 'string' && nodeIdMap.has(out.targetNodeId)) {
+      out.targetNodeId = nodeIdMap.get(out.targetNodeId)!;
+    }
+
+    // Remap routing defaultTarget.nodeId
+    if (out.defaultTarget && typeof out.defaultTarget === 'object') {
+      const dt = out.defaultTarget as Record<string, unknown>;
+      if (dt.type === 'node' && typeof dt.nodeId === 'string' && nodeIdMap.has(dt.nodeId)) {
+        out.defaultTarget = { ...dt, nodeId: nodeIdMap.get(dt.nodeId)! };
+      }
+    }
+
+    // Remap routing rules[].target.nodeId
+    if (Array.isArray(out.rules)) {
+      out.rules = (out.rules as Record<string, unknown>[]).map(rule => {
+        const target = rule.target as Record<string, unknown> | undefined;
+        if (target?.type === 'node' && typeof target.nodeId === 'string' && nodeIdMap.has(target.nodeId)) {
+          return { ...rule, target: { ...target, nodeId: nodeIdMap.get(target.nodeId)! } };
+        }
+        return rule;
+      });
+    }
+
+    return out;
   }
 
   private remapConfigs(
