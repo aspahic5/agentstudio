@@ -259,6 +259,20 @@ export class VersionRepository {
       });
     }
 
+    // Remap transitions[intent].target (intent_parsing, review nodes)
+    if (out.transitions && typeof out.transitions === 'object' && !Array.isArray(out.transitions)) {
+      const transitions = out.transitions as Record<string, Record<string, unknown>>;
+      const remapped: Record<string, Record<string, unknown>> = {};
+      for (const [intent, rule] of Object.entries(transitions)) {
+        if (typeof rule.target === 'string' && rule.target !== 'self' && rule.target !== 'complete' && nodeIdMap.has(rule.target)) {
+          remapped[intent] = { ...rule, target: nodeIdMap.get(rule.target)! };
+        } else {
+          remapped[intent] = rule;
+        }
+      }
+      out.transitions = remapped;
+    }
+
     return out;
   }
 
