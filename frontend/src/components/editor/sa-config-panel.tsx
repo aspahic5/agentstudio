@@ -84,7 +84,7 @@ export function SaConfigPanel({ config, onChange }: SaConfigPanelProps) {
 
       <div className="space-y-1.5">
         <Label className="text-xs">Output Formatting</Label>
-        <Select value={config.outputFormatting ?? 'markdown'} onValueChange={(v) => onChange({ outputFormatting: v })}>
+        <Select value={config.outputFormatting ?? 'markdown'} onValueChange={(v) => v && onChange({ outputFormatting: v })}>
           <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="plain">Plain</SelectItem>
@@ -95,7 +95,7 @@ export function SaConfigPanel({ config, onChange }: SaConfigPanelProps) {
 
       <div className="space-y-1.5">
         <Label className="text-xs">Output Density</Label>
-        <Select value={config.outputDensity ?? 'compact'} onValueChange={(v) => onChange({ outputDensity: v })}>
+        <Select value={config.outputDensity ?? 'compact'} onValueChange={(v) => v && onChange({ outputDensity: v })}>
           <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="compact">Compact</SelectItem>
@@ -106,7 +106,7 @@ export function SaConfigPanel({ config, onChange }: SaConfigPanelProps) {
 
       <div className="space-y-1.5">
         <Label className="text-xs">Reasoning Formatting</Label>
-        <Select value={config.reasoningFormatting ?? 'concise'} onValueChange={(v) => onChange({ reasoningFormatting: v })}>
+        <Select value={config.reasoningFormatting ?? 'concise'} onValueChange={(v) => v && onChange({ reasoningFormatting: v })}>
           <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="concise">Concise</SelectItem>

@@ -16,8 +16,6 @@ export function EditorPage() {
   const isLoading = useFlowStore((s) => s.isLoading);
   const error = useFlowStore((s) => s.error);
   const agent = useFlowStore((s) => s.agent);
-  const agentNodes = useFlowStore((s) => s.agentNodes);
-  const activeVersion = useFlowStore((s) => s.activeVersion);
   const selectedNodeId = useFlowStore((s) => s.selectedNodeId);
 
   useEffect(() => {
