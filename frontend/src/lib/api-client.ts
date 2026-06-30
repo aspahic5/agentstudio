@@ -1,5 +1,6 @@
 import type { AuthResponse, User, Agent, CreateAgentPayload, Session, Version } from '@/types/api';
 import type { SaveVersionPayload, OverwriteVersionPayload, VersionData } from '@/types/editor';
+import type { AISuggestRequest, AISuggestResponse } from '@/types/ai-editor';
 
 class ApiClient {
   private accessToken: string | null = null;
@@ -200,6 +201,14 @@ class ApiClient {
     return this.request(`/api/agents/${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  }
+
+  // AI Editor
+  async suggestEdit(body: AISuggestRequest): Promise<AISuggestResponse> {
+    return this.request('/api/ai-editor/suggest', {
+      method: 'POST',
+      body: JSON.stringify(body),
     });
   }
 
