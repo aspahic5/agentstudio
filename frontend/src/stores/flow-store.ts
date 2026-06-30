@@ -1,0 +1,483 @@
+import { create } from 'zustand';
+import { applyNodeChanges, type NodeChange, type Connection } from '@xyflow/react';
+import type { Agent, Version } from '@/types/api';
+import type {
+  EditorAgentNode,
+  EditorSaConfig,
+  EditorNodeType,
+  FlowNode,
+  FlowEdge,
+  EditorOperation,
+} from '@/types/editor';
+import { apiClient } from '@/lib/api-client';
+import { deriveEdges } from '@/lib/edge-derivation';
+import { getDefaultConfigJson, nodeTypeNeedsSaConfig } from '@/lib/node-type-meta';
+
+interface FlowState {
+  // Agent context
+  agentId: string | null;
+  agent: Agent | null;
+
+  // Version management
+  versions: Version[];
+  activeVersion: string | null;
+
+  // Editor data
+  agentNodes: Map<string, EditorAgentNode>;
+  saConfigs: Map<string, EditorSaConfig>;
+
+  // React Flow state
+  rfNodes: FlowNode[];
+  rfEdges: FlowEdge[];
+
+  // UI state
+  selectedNodeId: string | null;
+  isDirty: boolean;
+  isLoading: boolean;
+  isSaving: boolean;
+  error: string | null;
+
+  // Actions — data loading
+  loadAgent: (agentId: string) => Promise<void>;
+  loadVersions: () => Promise<void>;
+  loadVersionData: (version: string) => Promise<void>;
+
+  // Actions — React Flow callbacks
+  onNodesChange: (changes: NodeChange<FlowNode>[]) => void;
+  onConnect: (connection: Connection) => void;
+
+  // Actions — node management
+  addNode: (nodeType: EditorNodeType, position: { x: number; y: number }) => string;
+  updateNode: (nodeId: string, updates: Partial<EditorAgentNode>) => void;
+  removeNode: (nodeId: string) => void;
+  selectNode: (nodeId: string | null) => void;
+
+  // Actions — SA config management
+  updateSaConfig: (configId: string, updates: Partial<EditorSaConfig>) => void;
+  addSaConfig: (nodeId: string) => string;
+  removeSaConfig: (configId: string) => void;
+
+  // Actions — version operations
+  saveNewVersion: (version: string, label?: string) => Promise<void>;
+  overwriteVersion: () => Promise<void>;
+  deleteVersion: (version: string) => Promise<void>;
+
+  // Phase 7 prep
+  applyOperation: (op: EditorOperation) => void;
+
+  // Reset
+  reset: () => void;
+}
+
+function buildRfNodes(agentNodes: Map<string, EditorAgentNode>, selectedNodeId: string | null): FlowNode[] {
+  return Array.from(agentNodes.values()).map((node) => ({
+    id: node.id,
+    type: node.nodeType,
+    position: { x: node.positionX ?? 0, y: node.positionY ?? 0 },
+    data: {
+      agentNode: node,
+      isSelected: node.id === selectedNodeId,
+    },
+    selected: node.id === selectedNodeId,
+  }));
+}
+
+export const useFlowStore = create<FlowState>((set, get) => ({
+  agentId: null,
+  agent: null,
+  versions: [],
+  activeVersion: null,
+  agentNodes: new Map(),
+  saConfigs: new Map(),
+  rfNodes: [],
+  rfEdges: [],
+  selectedNodeId: null,
+  isDirty: false,
+  isLoading: false,
+  isSaving: false,
+  error: null,
+
+  loadAgent: async (agentId: string) => {
+    set({ isLoading: true, error: null, agentId });
+    try {
+      const agent = await apiClient.getAgent(agentId);
+      set({ agent });
+      await get().loadVersions();
+      if (agent.currentVersion) {
+        await get().loadVersionData(agent.currentVersion);
+      }
+    } catch (err) {
+      set({ error: (err as Error).message });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  loadVersions: async () => {
+    const { agentId } = get();
+    if (!agentId) return;
+    try {
+      const versions = await apiClient.getVersions(agentId);
+      set({ versions });
+    } catch (err) {
+      set({ error: (err as Error).message });
+    }
+  },
+
+  loadVersionData: async (version: string) => {
+    const { agentId } = get();
+    if (!agentId) return;
+    set({ isLoading: true, error: null });
+    try {
+      const data = await apiClient.getVersionData(agentId, version);
+      const agentNodes = new Map<string, EditorAgentNode>();
+      for (const n of data.nodes) {
+        agentNodes.set(n.id, {
+          ...n,
+          configJson: (n.configJson as Record<string, unknown>) ?? {},
+        });
+      }
+      const saConfigs = new Map<string, EditorSaConfig>();
+      for (const c of data.saConfigs) {
+        saConfigs.set(c.id, c);
+      }
+      const selectedNodeId = null;
+      set({
+        activeVersion: version,
+        agentNodes,
+        saConfigs,
+        selectedNodeId,
+        rfNodes: buildRfNodes(agentNodes, selectedNodeId),
+        rfEdges: deriveEdges(agentNodes),
+        isDirty: false,
+      });
+    } catch (err) {
+      set({ error: (err as Error).message });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  onNodesChange: (changes: NodeChange<FlowNode>[]) => {
+    const state = get();
+    const newRfNodes = applyNodeChanges(changes, state.rfNodes);
+
+    // Sync position changes back to agentNodes
+    let dirty = state.isDirty;
+    const agentNodes = new Map(state.agentNodes);
+    for (const change of changes) {
+      if (change.type === 'position' && change.position) {
+        const node = agentNodes.get(change.id);
+        if (node) {
+          agentNodes.set(change.id, {
+            ...node,
+            positionX: change.position.x,
+            positionY: change.position.y,
+          });
+          dirty = true;
+        }
+      }
+    }
+
+    set({ rfNodes: newRfNodes, agentNodes, isDirty: dirty });
+  },
+
+  onConnect: (connection: Connection) => {
+    if (!connection.source || !connection.target) return;
+
+    const { agentNodes } = get();
+    const sourceNode = agentNodes.get(connection.source);
+    if (!sourceNode) return;
+
+    const cfg = { ...(sourceNode.configJson ?? {}) } as Record<string, unknown>;
+
+    switch (sourceNode.nodeType) {
+      case 'generation':
+      case 'tool':
+      case 'agentic':
+      case 'compute':
+      case 'conversation':
+        cfg.targetNodeId = connection.target;
+        break;
+      case 'intent_parsing':
+      case 'review': {
+        const transitions = (cfg.transitions ?? {}) as Record<string, { target: string; actions: unknown[] }>;
+        const intentName = `intent_${Object.keys(transitions).length + 1}`;
+        transitions[intentName] = { target: connection.target, actions: [] };
+        cfg.transitions = transitions;
+        break;
+      }
+      case 'routing': {
+        const rules = (cfg.rules ?? []) as Array<{ condition: string; target: { type: string; nodeId?: string } }>;
+        rules.push({
+          condition: `condition_${rules.length + 1}`,
+          target: { type: 'node', nodeId: connection.target },
+        });
+        cfg.rules = rules;
+        break;
+      }
+    }
+
+    get().updateNode(sourceNode.id, { configJson: cfg });
+  },
+
+  addNode: (nodeType: EditorNodeType, position: { x: number; y: number }) => {
+    const nodeId = crypto.randomUUID();
+    const node: EditorAgentNode = {
+      id: nodeId,
+      name: `New ${nodeType.replace(/_/g, ' ')}`,
+      nodeType,
+      configJson: getDefaultConfigJson(nodeType),
+      positionX: position.x,
+      positionY: position.y,
+    };
+
+    const { agentNodes, saConfigs, selectedNodeId } = get();
+    const newNodes = new Map(agentNodes);
+    newNodes.set(nodeId, node);
+
+    const newConfigs = new Map(saConfigs);
+
+    if (nodeTypeNeedsSaConfig(nodeType)) {
+      const configId = crypto.randomUUID();
+      newConfigs.set(configId, {
+        id: configId,
+        nodeId,
+        name: `${node.name} Config`,
+        systemPrompt: '',
+        temperature: 0.7,
+        maxRetries: 2,
+        outputFormatting: 'markdown',
+        outputDensity: 'compact',
+        reasoningFormatting: 'concise',
+      });
+      newNodes.set(nodeId, { ...node, semanticAgentConfigId: configId });
+
+      // Review nodes need a second SA config for refinement
+      if (nodeType === 'review') {
+        const refinementConfigId = crypto.randomUUID();
+        newConfigs.set(refinementConfigId, {
+          id: refinementConfigId,
+          nodeId,
+          name: `${node.name} Refinement Config`,
+          systemPrompt: '',
+          temperature: 0.7,
+          maxRetries: 2,
+          outputFormatting: 'markdown',
+          outputDensity: 'compact',
+          reasoningFormatting: 'concise',
+        });
+      }
+    }
+
+    set({
+      agentNodes: newNodes,
+      saConfigs: newConfigs,
+      rfNodes: buildRfNodes(newNodes, selectedNodeId),
+      rfEdges: deriveEdges(newNodes),
+      isDirty: true,
+    });
+
+    return nodeId;
+  },
+
+  updateNode: (nodeId: string, updates: Partial<EditorAgentNode>) => {
+    const { agentNodes, selectedNodeId } = get();
+    const node = agentNodes.get(nodeId);
+    if (!node) return;
+
+    const newNodes = new Map(agentNodes);
+    newNodes.set(nodeId, { ...node, ...updates });
+
+    set({
+      agentNodes: newNodes,
+      rfNodes: buildRfNodes(newNodes, selectedNodeId),
+      rfEdges: deriveEdges(newNodes),
+      isDirty: true,
+    });
+  },
+
+  removeNode: (nodeId: string) => {
+    const { agentNodes, saConfigs, selectedNodeId } = get();
+
+    const newNodes = new Map(agentNodes);
+    newNodes.delete(nodeId);
+
+    const newConfigs = new Map(saConfigs);
+    for (const [id, config] of newConfigs) {
+      if (config.nodeId === nodeId) {
+        newConfigs.delete(id);
+      }
+    }
+
+    const newSelectedId = selectedNodeId === nodeId ? null : selectedNodeId;
+
+    set({
+      agentNodes: newNodes,
+      saConfigs: newConfigs,
+      selectedNodeId: newSelectedId,
+      rfNodes: buildRfNodes(newNodes, newSelectedId),
+      rfEdges: deriveEdges(newNodes),
+      isDirty: true,
+    });
+  },
+
+  selectNode: (nodeId: string | null) => {
+    const { agentNodes } = get();
+    set({
+      selectedNodeId: nodeId,
+      rfNodes: buildRfNodes(agentNodes, nodeId),
+    });
+  },
+
+  updateSaConfig: (configId: string, updates: Partial<EditorSaConfig>) => {
+    const { saConfigs } = get();
+    const config = saConfigs.get(configId);
+    if (!config) return;
+
+    const newConfigs = new Map(saConfigs);
+    newConfigs.set(configId, { ...config, ...updates });
+
+    set({ saConfigs: newConfigs, isDirty: true });
+  },
+
+  addSaConfig: (nodeId: string) => {
+    const configId = crypto.randomUUID();
+    const { saConfigs } = get();
+    const newConfigs = new Map(saConfigs);
+    newConfigs.set(configId, {
+      id: configId,
+      nodeId,
+      name: 'New Config',
+      systemPrompt: '',
+      temperature: 0.7,
+      maxRetries: 2,
+      outputFormatting: 'markdown',
+      outputDensity: 'compact',
+      reasoningFormatting: 'concise',
+    });
+    set({ saConfigs: newConfigs, isDirty: true });
+    return configId;
+  },
+
+  removeSaConfig: (configId: string) => {
+    const { saConfigs } = get();
+    const newConfigs = new Map(saConfigs);
+    newConfigs.delete(configId);
+    set({ saConfigs: newConfigs, isDirty: true });
+  },
+
+  saveNewVersion: async (version: string, label?: string) => {
+    const { agentId, agentNodes, saConfigs } = get();
+    if (!agentId) return;
+
+    set({ isSaving: true, error: null });
+    try {
+      await apiClient.saveNewVersion(agentId, {
+        version,
+        label,
+        nodes: Array.from(agentNodes.values()),
+        saConfigs: Array.from(saConfigs.values()),
+      });
+      await get().loadVersions();
+      await get().loadVersionData(version);
+    } catch (err) {
+      set({ error: (err as Error).message });
+      throw err;
+    } finally {
+      set({ isSaving: false });
+    }
+  },
+
+  overwriteVersion: async () => {
+    const { agentId, activeVersion, agentNodes, saConfigs } = get();
+    if (!agentId || !activeVersion) return;
+
+    set({ isSaving: true, error: null });
+    try {
+      await apiClient.overwriteVersion(agentId, activeVersion, {
+        nodes: Array.from(agentNodes.values()),
+        saConfigs: Array.from(saConfigs.values()),
+      });
+      await get().loadVersionData(activeVersion);
+    } catch (err) {
+      set({ error: (err as Error).message });
+      throw err;
+    } finally {
+      set({ isSaving: false });
+    }
+  },
+
+  deleteVersion: async (version: string) => {
+    const { agentId, activeVersion } = get();
+    if (!agentId) return;
+
+    try {
+      await apiClient.deleteVersion(agentId, version);
+      await get().loadVersions();
+      if (activeVersion === version) {
+        const { versions } = get();
+        if (versions.length > 0) {
+          await get().loadVersionData(versions[0].version);
+        } else {
+          set({
+            activeVersion: null,
+            agentNodes: new Map(),
+            saConfigs: new Map(),
+            rfNodes: [],
+            rfEdges: [],
+            selectedNodeId: null,
+            isDirty: false,
+          });
+        }
+      }
+    } catch (err) {
+      set({ error: (err as Error).message });
+    }
+  },
+
+  applyOperation: (op: EditorOperation) => {
+    const state = get();
+    switch (op.type) {
+      case 'add_node': {
+        const nodeId = state.addNode(op.nodeType, op.position);
+        if (op.name) {
+          get().updateNode(nodeId, { name: op.name });
+        }
+        break;
+      }
+      case 'update_node':
+        state.updateNode(op.nodeId, op.updates);
+        break;
+      case 'remove_node':
+        state.removeNode(op.nodeId);
+        break;
+      case 'update_positions':
+        for (const pos of op.positions) {
+          const node = state.agentNodes.get(pos.nodeId);
+          if (node) {
+            state.updateNode(pos.nodeId, { positionX: pos.x, positionY: pos.y });
+          }
+        }
+        break;
+    }
+  },
+
+  reset: () => {
+    set({
+      agentId: null,
+      agent: null,
+      versions: [],
+      activeVersion: null,
+      agentNodes: new Map(),
+      saConfigs: new Map(),
+      rfNodes: [],
+      rfEdges: [],
+      selectedNodeId: null,
+      isDirty: false,
+      isLoading: false,
+      isSaving: false,
+      error: null,
+    });
+  },
+}));

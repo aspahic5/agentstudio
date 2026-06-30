@@ -1,4 +1,5 @@
-import type { AuthResponse, User, Agent, CreateAgentPayload, Session } from '@/types/api';
+import type { AuthResponse, User, Agent, CreateAgentPayload, Session, Version } from '@/types/api';
+import type { SaveVersionPayload, OverwriteVersionPayload, VersionData } from '@/types/editor';
 
 class ApiClient {
   private accessToken: string | null = null;
@@ -156,6 +157,50 @@ class ApiClient {
 
   async deleteSession(sessionId: string): Promise<void> {
     return this.request(`/api/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
+  }
+
+  // Versions
+  async getVersions(agentId: string): Promise<Version[]> {
+    return this.request(`/api/agents/${encodeURIComponent(agentId)}/versions`);
+  }
+
+  async getVersionData(agentId: string, version: string): Promise<VersionData> {
+    return this.request(`/api/agents/${encodeURIComponent(agentId)}/versions/${encodeURIComponent(version)}/data`);
+  }
+
+  async saveNewVersion(agentId: string, payload: SaveVersionPayload): Promise<void> {
+    return this.request(`/api/agents/${encodeURIComponent(agentId)}/versions`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async overwriteVersion(agentId: string, version: string, payload: OverwriteVersionPayload): Promise<void> {
+    return this.request(`/api/agents/${encodeURIComponent(agentId)}/versions/${encodeURIComponent(version)}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateVersionLabel(agentId: string, version: string, label: string): Promise<Version> {
+    return this.request(`/api/agents/${encodeURIComponent(agentId)}/versions/${encodeURIComponent(version)}/label`, {
+      method: 'PUT',
+      body: JSON.stringify({ label }),
+    });
+  }
+
+  async deleteVersion(agentId: string, version: string): Promise<void> {
+    return this.request(`/api/agents/${encodeURIComponent(agentId)}/versions/${encodeURIComponent(version)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Agent update
+  async updateAgent(id: string, data: Partial<Pick<Agent, 'name' | 'description' | 'initialNodeId' | 'inputContract' | 'metadata'>>): Promise<Agent> {
+    return this.request(`/api/agents/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   }
 
   // Messages (SSE stream)
