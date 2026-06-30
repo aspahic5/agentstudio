@@ -9,6 +9,7 @@ import type {
   FlowEdge,
   EditorOperation,
 } from '@/types/editor';
+import type { AIEditOperation } from '@/types/ai-editor';
 import { apiClient } from '@/lib/api-client';
 import { deriveEdges } from '@/lib/edge-derivation';
 import { getDefaultConfigJson, nodeTypeNeedsSaConfig } from '@/lib/node-type-meta';
@@ -65,11 +66,21 @@ interface FlowState {
   // Phase 7 prep
   applyOperation: (op: EditorOperation) => void;
 
+  // AI editor highlights
+  nodeHighlights: Map<string, 'added' | 'modified' | 'removed'>;
+  setNodeHighlights: (highlights: Map<string, 'added' | 'modified' | 'removed'>) => void;
+  clearNodeHighlights: () => void;
+  applyAIOperation: (op: AIEditOperation) => void;
+
   // Reset
   reset: () => void;
 }
 
-function buildRfNodes(agentNodes: Map<string, EditorAgentNode>, selectedNodeId: string | null): FlowNode[] {
+function buildRfNodes(
+  agentNodes: Map<string, EditorAgentNode>,
+  selectedNodeId: string | null,
+  nodeHighlights?: Map<string, 'added' | 'modified' | 'removed'>,
+): FlowNode[] {
   return Array.from(agentNodes.values()).map((node) => ({
     id: node.id,
     type: node.nodeType,
@@ -77,6 +88,7 @@ function buildRfNodes(agentNodes: Map<string, EditorAgentNode>, selectedNodeId: 
     data: {
       agentNode: node,
       isSelected: node.id === selectedNodeId,
+      isHighlighted: nodeHighlights?.get(node.id),
     },
     selected: node.id === selectedNodeId,
   }));
@@ -147,7 +159,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         agentNodes,
         saConfigs,
         selectedNodeId,
-        rfNodes: buildRfNodes(agentNodes, selectedNodeId),
+        rfNodes: buildRfNodes(agentNodes, selectedNodeId, get().nodeHighlights),
         rfEdges: deriveEdges(agentNodes),
         isDirty: false,
       });
@@ -273,7 +285,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({
       agentNodes: newNodes,
       saConfigs: newConfigs,
-      rfNodes: buildRfNodes(newNodes, selectedNodeId),
+      rfNodes: buildRfNodes(newNodes, selectedNodeId, get().nodeHighlights),
       rfEdges: deriveEdges(newNodes),
       isDirty: true,
     });
@@ -291,7 +303,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
     set({
       agentNodes: newNodes,
-      rfNodes: buildRfNodes(newNodes, selectedNodeId),
+      rfNodes: buildRfNodes(newNodes, selectedNodeId, get().nodeHighlights),
       rfEdges: deriveEdges(newNodes),
       isDirty: true,
     });
@@ -316,7 +328,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       agentNodes: newNodes,
       saConfigs: newConfigs,
       selectedNodeId: newSelectedId,
-      rfNodes: buildRfNodes(newNodes, newSelectedId),
+      rfNodes: buildRfNodes(newNodes, newSelectedId, get().nodeHighlights),
       rfEdges: deriveEdges(newNodes),
       isDirty: true,
     });
@@ -326,7 +338,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const { agentNodes } = get();
     set({
       selectedNodeId: nodeId,
-      rfNodes: buildRfNodes(agentNodes, nodeId),
+      rfNodes: buildRfNodes(agentNodes, nodeId, get().nodeHighlights),
     });
   },
 
@@ -463,6 +475,140 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
   },
 
+  nodeHighlights: new Map(),
+
+  setNodeHighlights: (highlights) => {
+    const { agentNodes, selectedNodeId } = get();
+    set({
+      nodeHighlights: highlights,
+      rfNodes: buildRfNodes(agentNodes, selectedNodeId, highlights),
+    });
+  },
+
+  clearNodeHighlights: () => {
+    const { agentNodes, selectedNodeId } = get();
+    const empty = new Map<string, 'added' | 'modified' | 'removed'>();
+    set({
+      nodeHighlights: empty,
+      rfNodes: buildRfNodes(agentNodes, selectedNodeId, empty),
+    });
+  },
+
+  applyAIOperation: (op: AIEditOperation) => {
+    const state = get();
+    switch (op.op) {
+      case 'add_node': {
+        const nodeId = state.addNode(op.node.nodeType as EditorNodeType, op.position ?? { x: 0, y: 0 });
+        const updates: Partial<EditorAgentNode> = { name: op.node.name };
+        if (op.node.configJson) updates.configJson = op.node.configJson;
+        if (op.node.phaseLabel) updates.phaseLabel = op.node.phaseLabel;
+        if (op.node.progressWeight !== undefined) updates.progressWeight = op.node.progressWeight;
+        get().updateNode(nodeId, updates);
+        if (op.saConfig) {
+          const node = get().agentNodes.get(nodeId);
+          if (node?.semanticAgentConfigId) {
+            const saUpdates: Partial<EditorSaConfig> = {};
+            if (op.saConfig.name) saUpdates.name = op.saConfig.name;
+            if (op.saConfig.systemPrompt) saUpdates.systemPrompt = op.saConfig.systemPrompt;
+            if (op.saConfig.temperature !== undefined) saUpdates.temperature = op.saConfig.temperature;
+            if (op.saConfig.maxRetries !== undefined) saUpdates.maxRetries = op.saConfig.maxRetries;
+            if (op.saConfig.outputSchemaJson !== undefined) saUpdates.outputSchemaJson = op.saConfig.outputSchemaJson;
+            if (op.saConfig.outputFormatting) saUpdates.outputFormatting = op.saConfig.outputFormatting;
+            if (op.saConfig.outputDensity) saUpdates.outputDensity = op.saConfig.outputDensity;
+            if (op.saConfig.reasoningFormatting) saUpdates.reasoningFormatting = op.saConfig.reasoningFormatting;
+            get().updateSaConfig(node.semanticAgentConfigId, saUpdates);
+          }
+        }
+        break;
+      }
+      case 'update_node': {
+        const node = state.agentNodes.get(op.nodeId);
+        if (!node) break;
+        const updates: Partial<EditorAgentNode> = {};
+        const changes = op.changes;
+        if (changes.name) updates.name = changes.name as string;
+        if (changes.phaseLabel !== undefined) updates.phaseLabel = changes.phaseLabel as string;
+        if (changes.configJson) {
+          updates.configJson = { ...node.configJson, ...(changes.configJson as Record<string, unknown>) };
+        }
+        state.updateNode(op.nodeId, updates);
+        break;
+      }
+      case 'remove_node':
+        state.removeNode(op.nodeId);
+        break;
+      case 'add_sa_config': {
+        const saId = state.addSaConfig(op.saConfig.nodeId);
+        const { nodeId: _, ...saUpdates } = op.saConfig;
+        get().updateSaConfig(saId, saUpdates as Partial<EditorSaConfig>);
+        break;
+      }
+      case 'update_sa_config': {
+        const configs = Array.from(get().saConfigs.values());
+        const config = configs.find(c => c.nodeId === op.nodeId);
+        if (config) {
+          get().updateSaConfig(config.id, op.changes as Partial<EditorSaConfig>);
+        }
+        break;
+      }
+      case 'update_agent': {
+        const agent = get().agent;
+        if (agent) {
+          set({ agent: { ...agent, ...op.changes }, isDirty: true });
+        }
+        break;
+      }
+      case 'add_transition':
+      case 'update_transition': {
+        const node = get().agentNodes.get(op.nodeId);
+        if (!node) break;
+        const configJson = { ...node.configJson };
+        const transitions = { ...(configJson.transitions as Record<string, unknown> ?? {}) };
+        transitions[op.intent] = op.rule;
+        configJson.transitions = transitions;
+        const validIntents = [...(configJson.validIntents as string[] ?? [])];
+        if (!validIntents.includes(op.intent)) {
+          validIntents.push(op.intent);
+          configJson.validIntents = validIntents;
+        }
+        get().updateNode(op.nodeId, { configJson });
+        break;
+      }
+      case 'remove_transition': {
+        const node = get().agentNodes.get(op.nodeId);
+        if (!node) break;
+        const configJson = { ...node.configJson };
+        const transitions = { ...(configJson.transitions as Record<string, unknown> ?? {}) };
+        delete transitions[op.intent];
+        configJson.transitions = transitions;
+        get().updateNode(op.nodeId, { configJson });
+        break;
+      }
+      case 'add_routing_rule': {
+        const node = get().agentNodes.get(op.nodeId);
+        if (!node) break;
+        const configJson = { ...node.configJson };
+        const rules = [...(configJson.rules as unknown[] ?? [])];
+        rules.push(op.rule);
+        configJson.rules = rules;
+        get().updateNode(op.nodeId, { configJson });
+        break;
+      }
+      case 'update_routing_rule': {
+        const node = get().agentNodes.get(op.nodeId);
+        if (!node) break;
+        const configJson = { ...node.configJson };
+        const rules = [...(configJson.rules as unknown[] ?? [])];
+        if (op.ruleIndex < rules.length) {
+          rules[op.ruleIndex] = op.rule;
+        }
+        configJson.rules = rules;
+        get().updateNode(op.nodeId, { configJson });
+        break;
+      }
+    }
+  },
+
   reset: () => {
     set({
       agentId: null,
@@ -478,6 +624,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       isLoading: false,
       isSaving: false,
       error: null,
+      nodeHighlights: new Map(),
     });
   },
 }));
