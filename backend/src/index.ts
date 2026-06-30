@@ -7,6 +7,7 @@ import agentRoutes from './routes/agents.js';
 import toolRoutes from './routes/tools.js';
 import sessionRoutes from './routes/sessions.js';
 import mcpPlugin from './mcp/plugin.js';
+import aiEditorRoutes from './routes/ai-editor.js';
 
 const app = Fastify({
   logger: process.env.NODE_ENV === 'production'
@@ -42,6 +43,7 @@ await app.register(agentRoutes, { prefix: '/api/agents' });
 await app.register(toolRoutes, { prefix: '/api/tools' });
 await app.register(sessionRoutes, { prefix: '/api' });
 await app.register(mcpPlugin);
+await app.register(aiEditorRoutes, { prefix: '/api/ai-editor' });
 
 try {
   await app.listen({ port: config.PORT, host: config.HOST });
