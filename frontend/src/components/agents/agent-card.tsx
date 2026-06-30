@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { MessageSquare, Trash2 } from 'lucide-react';
+import { MessageSquare, Pencil, Trash2 } from 'lucide-react';
 import type { Agent } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +50,15 @@ export function AgentCard({ agent }: AgentCardProps) {
           </span>
         </div>
         <div className="flex gap-2 mt-3">
+          <Button
+            size="sm"
+            variant="secondary"
+            className="flex-1"
+            onClick={() => navigate(`/agents/${agent.id}/editor`)}
+          >
+            <Pencil size={14} className="mr-1.5" />
+            Edit
+          </Button>
           <Button
             size="sm"
             className="flex-1 bg-primary hover:bg-primary-dark text-white"
