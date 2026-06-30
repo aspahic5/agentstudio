@@ -36,8 +36,8 @@ const routingTargetSchema = z.discriminatedUnion('type', [
 ]);
 
 const contextMappingSchema = z.object({
-  from: z.string(),
-  to: z.string(),
+  sourceKey: z.string(),
+  targetKey: z.string(),
 });
 
 const routingRuleSchema = z.object({
