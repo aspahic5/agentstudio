@@ -13,7 +13,8 @@ export function Header({ onMenuClick }: HeaderProps) {
   const location = useLocation();
 
   const label = routeLabels[location.pathname]
-    ?? (location.pathname.includes('/chat') ? 'Chat' : '');
+    || (location.pathname.includes('/editor') ? 'Editor' : '')
+    || (location.pathname.includes('/chat') ? 'Chat' : '');
 
   return (
     <header className="h-14 flex items-center gap-3 px-4 border-b border-border-light bg-white sticky top-0 z-30">
