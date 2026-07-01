@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useFlowStore } from '@/stores/flow-store';
+import { useAIEditorStore } from '@/stores/ai-editor-store';
 import { EditorCanvas } from '@/components/editor/editor-canvas';
 import { NodePalette } from '@/components/editor/node-palette';
 import { EditorTestChat } from '@/components/editor/editor-test-chat';
 import { EditorToolbar } from '@/components/editor/editor-toolbar';
 import { NodeConfigPanel } from '@/components/editor/node-config-panel';
+import { AIEditorPanel } from '@/components/editor/ai-editor/ai-editor-panel';
 
 export function EditorPage() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -17,6 +19,7 @@ export function EditorPage() {
   const error = useFlowStore((s) => s.error);
   const agent = useFlowStore((s) => s.agent);
   const selectedNodeId = useFlowStore((s) => s.selectedNodeId);
+  const aiEditorOpen = useAIEditorStore((s) => s.isOpen);
 
   useEffect(() => {
     if (agentId) {
@@ -53,6 +56,7 @@ export function EditorPage() {
         </div>
       </div>
       {selectedNodeId && <NodeConfigPanel />}
+      {aiEditorOpen && <AIEditorPanel />}
       {testChatOpen && agentId && (
         <EditorTestChat agentId={agentId} onClose={() => setTestChatOpen(false)} />
       )}

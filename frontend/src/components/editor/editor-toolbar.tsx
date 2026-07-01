@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, Save, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Save, ChevronDown, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +13,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { useFlowStore } from '@/stores/flow-store';
+import { useAIEditorStore } from '@/stores/ai-editor-store';
 import { VersionPanel } from './version-panel';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +25,10 @@ export function EditorToolbar() {
   const isSaving = useFlowStore((s) => s.isSaving);
   const saveNewVersion = useFlowStore((s) => s.saveNewVersion);
   const overwriteVersion = useFlowStore((s) => s.overwriteVersion);
+
+  const aiEditorOpen = useAIEditorStore((s) => s.isOpen);
+  const openAIEditor = useAIEditorStore((s) => s.open);
+  const closeAIEditor = useAIEditorStore((s) => s.close);
 
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -98,6 +103,17 @@ export function EditorToolbar() {
         )}
 
         <div className="flex-1" />
+
+        {/* AI Editor */}
+        <Button
+          size="sm"
+          variant={aiEditorOpen ? 'default' : 'ghost'}
+          onClick={() => (aiEditorOpen ? closeAIEditor() : openAIEditor())}
+          className={cn(aiEditorOpen && 'bg-primary text-white')}
+        >
+          <Sparkles size={14} className="mr-1.5" />
+          AI Editor
+        </Button>
 
         {/* Save */}
         <Button

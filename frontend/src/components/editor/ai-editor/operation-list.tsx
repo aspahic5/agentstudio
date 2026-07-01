@@ -1,6 +1,6 @@
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AIEditOperation } from '@/types/ai-editor';
+import type { AIEditOperation } from '@/types/ai-editor';
 
 function getOperationIcon(op: AIEditOperation['op']) {
   if (op.startsWith('add_')) {
