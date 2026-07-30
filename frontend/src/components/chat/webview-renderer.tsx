@@ -16,10 +16,10 @@ export function WebViewRenderer({ content, onSubmit, disabled }: WebViewRenderer
 
   useEffect(() => {
     const handler = (e: MessageEvent) => {
-      // Only accept messages originating from our own iframe's contentWindow.
-      // When sandbox does not include allow-same-origin the iframe origin is
-      // "null"; we verify against the iframe element reference instead of the
-      // opaque "null" string so that unrelated null-origin sources are rejected.
+      // The iframe runs with sandbox="allow-scripts" but NOT allow-same-origin,
+      // so its origin is the opaque string "null". We validate by comparing
+      // e.source to the iframe's contentWindow at handler-call time (not at
+      // effect-setup time, since contentWindow may not be set yet at mount).
       if (e.source !== iframeRef.current?.contentWindow) return;
       if (e.data?.type === 'webview-submit' && !disabledRef.current) {
         onSubmitRef.current?.(e.data.data as Record<string, unknown>);
@@ -29,15 +29,10 @@ export function WebViewRenderer({ content, onSubmit, disabled }: WebViewRenderer
     return () => window.removeEventListener('message', handler);
   }, []);
 
-  // The bridge posts to the parent with the explicit parent origin so that
-  // only this application can receive the message. Using window.location.origin
-  // from inside a sandboxed-without-same-origin iframe would be "null", so the
-  // bridge captures the parent origin at srcdoc injection time via a data
-  // attribute read, which is unavailable. Instead we pass the origin as a
-  // JS constant embedded at render time — this is safe because the value is
-  // the server-controlled page origin, not user input.
-  const parentOrigin = window.location.origin;
-  const bridgeScript = `window.submit=function(d){window.parent.postMessage({type:'webview-submit',data:d},${JSON.stringify(parentOrigin)})};`;
+  // The iframe's origin is "null" (sandboxed without allow-same-origin), so
+  // targetOrigin '*' is required — the iframe cannot post to a specific origin.
+  // The e.source check above ensures we only act on messages from our own iframe.
+  const bridgeScript = `window.submit=function(d){window.parent.postMessage({type:'webview-submit',data:d},'*')};`;
 
   const srcdoc = `<!DOCTYPE html>
 <html><head><style>${content.css ?? ''}</style></head>
