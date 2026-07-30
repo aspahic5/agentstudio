@@ -51,6 +51,7 @@ export function validateAgentSchemas(
 
 export function validateAgentGraph(agent: AgentDefinition, nodes: AgentNode[]): void {
   const nodeIds = new Set(nodes.map((n) => n.id));
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
 
   if (!nodeIds.has(agent.initialNodeId)) {
     throw new ApplicationError(
@@ -100,4 +101,47 @@ export function validateAgentGraph(agent: AgentDefinition, nodes: AgentNode[]): 
     }
   }
 
+  // Reachability check: BFS from initialNodeId
+  const reachable = new Set<string>();
+  const queue: string[] = [agent.initialNodeId];
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    if (reachable.has(id)) continue;
+    reachable.add(id);
+    const node = nodeMap.get(id);
+    if (!node) continue;
+    if (node.nodeType === 'intent_parsing' || node.nodeType === 'review') {
+      for (const rule of Object.values(node.transitions)) {
+        if (rule.target !== 'self' && rule.target !== 'complete' && nodeIds.has(rule.target)) {
+          queue.push(rule.target);
+        }
+      }
+    } else if (
+      node.nodeType === 'generation' ||
+      node.nodeType === 'tool' ||
+      node.nodeType === 'agentic' ||
+      node.nodeType === 'compute' ||
+      node.nodeType === 'conversation'
+    ) {
+      if (nodeIds.has(node.targetNodeId)) queue.push(node.targetNodeId);
+    } else if (node.nodeType === 'routing') {
+      for (const rule of node.rules) {
+        if (rule.target.type === 'node' && nodeIds.has(rule.target.nodeId)) {
+          queue.push(rule.target.nodeId);
+        }
+      }
+      if (node.defaultTarget.type === 'node' && nodeIds.has(node.defaultTarget.nodeId)) {
+        queue.push(node.defaultTarget.nodeId);
+      }
+    }
+  }
+
+  const unreachable = nodes.filter((n) => !reachable.has(n.id));
+  if (unreachable.length > 0) {
+    const list = unreachable.map((n) => `"${n.id}" (name: "${n.name}")`).join(', ');
+    throw new ApplicationError(
+      `The following nodes are unreachable from the initial node and have no incoming connection: ${list}`,
+      { code: 'VALIDATION_ERROR', statusCode: 400, context: { unreachableNodes: unreachable.map((n) => n.id) } }
+    );
+  }
 }
