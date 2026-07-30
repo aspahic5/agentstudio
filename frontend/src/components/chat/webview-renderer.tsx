@@ -16,12 +16,13 @@ export function WebViewRenderer({ content, onSubmit, disabled }: WebViewRenderer
 
   useEffect(() => {
     const handler = (e: MessageEvent) => {
-      // The iframe runs with sandbox="allow-scripts" but NOT allow-same-origin,
-      // so its origin is the opaque string "null". We validate by comparing
-      // e.source to the iframe's contentWindow at handler-call time (not at
-      // effect-setup time, since contentWindow may not be set yet at mount).
-      if (e.source !== iframeRef.current?.contentWindow) return;
-      if (e.data?.type === 'webview-submit' && !disabledRef.current) {
+      if (e.data?.type !== 'webview-submit') return;
+      // Sandboxed iframes (no allow-same-origin) have opaque "null" origin.
+      // Accept only if source matches our iframe OR origin is "null" (sandboxed).
+      const fromOurIframe = e.source === iframeRef.current?.contentWindow;
+      const fromSandboxed = e.origin === 'null';
+      if (!fromOurIframe && !fromSandboxed) return;
+      if (!disabledRef.current) {
         onSubmitRef.current?.(e.data.data as Record<string, unknown>);
       }
     };
