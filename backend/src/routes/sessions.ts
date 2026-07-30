@@ -113,7 +113,7 @@ export default async function sessionRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: 'Not authorized' });
     }
     const snapshot = await snapshotRepository.load(sessionId);
-    if (!snapshot) return reply.send({ messages: [] });
+    if (!snapshot) return reply.send({ messages: [], webview: null });
 
     const engine = (snapshot.context.data?._engine as Record<string, unknown> | undefined);
     const conversation = engine?.conversation as Record<string, unknown> | undefined;
@@ -129,7 +129,22 @@ export default async function sessionRoutes(app: FastifyInstance) {
       messages.push({ role: 'assistant', content: r.assistantMessage });
     }
 
-    return reply.send({ messages });
+    // If the current node has a webviewConfig, include it so the frontend can re-render the form
+    let webview: { nodeId: string; html: string; css?: string; js?: string } | null = null;
+    const currentNodeId = snapshot.context.currentNodeId;
+    if (currentNodeId) {
+      const nodeRows = await nodeRepository.findByAgentVersion(session.agentId, session.version);
+      const currentNode = nodeRows.find((n) => n.id === currentNodeId);
+      if (currentNode) {
+        const cfg = (currentNode.configJson ?? {}) as Record<string, unknown>;
+        const webviewConfig = cfg.webviewConfig as { html?: string; css?: string; js?: string } | undefined;
+        if (webviewConfig?.html) {
+          webview = { nodeId: currentNodeId, html: webviewConfig.html, css: webviewConfig.css, js: webviewConfig.js };
+        }
+      }
+    }
+
+    return reply.send({ messages, webview });
   });
 
   app.delete('/sessions/:sessionId', async (request, reply) => {

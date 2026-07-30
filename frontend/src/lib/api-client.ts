@@ -160,7 +160,10 @@ class ApiClient {
     return this.request(`/api/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
   }
 
-  async getSessionHistory(sessionId: string): Promise<{ messages: Array<{ role: 'user' | 'assistant'; content: string }> }> {
+  async getSessionHistory(sessionId: string): Promise<{
+    messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+    webview: { nodeId: string; html: string; css?: string; js?: string } | null;
+  }> {
     return this.request(`/api/sessions/${encodeURIComponent(sessionId)}/history`);
   }
 

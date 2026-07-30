@@ -14,6 +14,7 @@ interface ChatState {
   thinkingState: ThinkingState | null;
   currentOptions: OptionsConfig | null;
   pendingOptions: OptionsConfig | null;
+  pendingWebview: WebViewContent | null;
   currentPhase: { phase: string; name: string } | null;
   webviewContent: WebViewContent | null;
   error: string | null;
@@ -55,6 +56,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   thinkingState: null,
   currentOptions: null,
   pendingOptions: null,
+  pendingWebview: null,
   currentPhase: null,
   webviewContent: null,
   error: null,
@@ -175,15 +177,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       case 'webview': {
         set({
           webviewContent: event.content,
-          timeline: [
-            ...state.timeline,
-            {
-              type: 'webview',
-              id: genId(),
-              content: event.content,
-              timestamp: Date.now(),
-            },
-          ],
+          pendingWebview: event.content,
         });
         break;
       }
@@ -192,10 +186,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
         // Finalize streaming text into assistant message
         let timeline = state.timeline;
         let pendingOpts = state.pendingOptions;
+        const pendingWv = state.pendingWebview;
         if (state.streamingContent) {
           const msg = finalizeAssistant(state.streamingContent, pendingOpts);
           timeline = [...timeline, { type: 'message', message: msg }];
           pendingOpts = null;
+        }
+
+        // Append webview AFTER the message bubble so it shows below
+        if (pendingWv) {
+          timeline = [
+            ...timeline,
+            { type: 'webview', id: genId(), content: pendingWv, timestamp: Date.now() },
+          ];
         }
 
         // If isComplete, add a completed entry
@@ -217,6 +220,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           isStreaming: false,
           isComplete: event.isComplete,
           pendingOptions: null,
+          pendingWebview: null,
           thinkingState: state.thinkingState
             ? { ...state.thinkingState, isActive: false }
             : null,
@@ -256,11 +260,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     let timeline = state.timeline;
     let pendingOpts = state.pendingOptions;
+    const pendingWv = state.pendingWebview;
 
     if (state.streamingContent) {
       const msg = finalizeAssistant(state.streamingContent, pendingOpts);
       timeline = [...timeline, { type: 'message', message: msg }];
       pendingOpts = null;
+    }
+
+    if (pendingWv) {
+      timeline = [
+        ...timeline,
+        { type: 'webview', id: genId(), content: pendingWv, timestamp: Date.now() },
+      ];
     }
 
     if (pendingOpts) {
@@ -272,6 +284,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       streamingContent: '',
       isStreaming: false,
       pendingOptions: null,
+      pendingWebview: null,
       thinkingState: state.thinkingState
         ? { ...state.thinkingState, isActive: false }
         : null,
@@ -303,6 +316,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       thinkingState: null,
       currentOptions: null,
       pendingOptions: null,
+      pendingWebview: null,
       currentPhase: null,
       webviewContent: null,
       error: null,
@@ -310,7 +324,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   loadHistory: async (sessionId: string) => {
-    const { messages } = await apiClient.getSessionHistory(sessionId);
+    const { messages, webview } = await apiClient.getSessionHistory(sessionId);
     if (messages.length === 0) return;
     const timeline: ChatEntry[] = messages.map((m) => ({
       type: 'message' as const,
@@ -321,6 +335,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
         timestamp: Date.now(),
       },
     }));
+    if (webview) {
+      timeline.push({
+        type: 'webview',
+        id: genId(),
+        content: webview,
+        timestamp: Date.now(),
+      });
+    }
     set({ timeline });
   },
 
@@ -335,6 +357,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       thinkingState: null,
       currentOptions: null,
       pendingOptions: null,
+      pendingWebview: null,
       currentPhase: null,
       webviewContent: null,
       error: null,
