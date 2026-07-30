@@ -43,7 +43,7 @@ export function WebViewRenderer({ content, onSubmit, disabled }: WebViewRenderer
     <iframe
       ref={iframeRef}
       srcDoc={srcdoc}
-      sandbox="allow-scripts"
+      sandbox="allow-scripts allow-forms"
       title={`WebView ${content.nodeId}`}
       className="w-full border border-border-light rounded-lg"
       style={{ minHeight: 200 }}
