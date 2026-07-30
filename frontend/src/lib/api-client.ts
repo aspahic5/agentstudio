@@ -1,4 +1,4 @@
-import type { AuthResponse, User, Agent, CreateAgentPayload, Session, Version } from '@/types/api';
+import type { AuthResponse, User, Agent, CreateAgentPayload, Session, Version, ToolDefinition, CreateToolPayload, UpdateToolPayload } from '@/types/api';
 import type { SaveVersionPayload, OverwriteVersionPayload, VersionData } from '@/types/editor';
 import type { AISuggestRequest, AISuggestResponse } from '@/types/ai-editor';
 
@@ -160,6 +160,10 @@ class ApiClient {
     return this.request(`/api/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
   }
 
+  async getSessionHistory(sessionId: string): Promise<{ messages: Array<{ role: 'user' | 'assistant'; content: string }> }> {
+    return this.request(`/api/sessions/${encodeURIComponent(sessionId)}/history`);
+  }
+
   // Versions
   async getVersions(agentId: string): Promise<Version[]> {
     return this.request(`/api/agents/${encodeURIComponent(agentId)}/versions`);
@@ -210,6 +214,23 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(body),
     });
+  }
+
+  // Tool definitions
+  async getToolDefinitions(): Promise<ToolDefinition[]> {
+    return this.request('/api/tools');
+  }
+
+  async createToolDefinition(data: CreateToolPayload): Promise<ToolDefinition> {
+    return this.request('/api/tools', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateToolDefinition(toolId: string, data: UpdateToolPayload): Promise<ToolDefinition> {
+    return this.request(`/api/tools/${encodeURIComponent(toolId)}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteToolDefinition(toolId: string): Promise<void> {
+    return this.request(`/api/tools/${encodeURIComponent(toolId)}`, { method: 'DELETE' });
   }
 
   // Messages (SSE stream)

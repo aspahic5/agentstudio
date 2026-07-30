@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { ChatEntry, ChatMessage, ThinkingState } from '@/types/chat';
 import type { ParsedStreamEvent, OptionsConfig, WebViewContent } from '@/types/stream';
+import { apiClient } from '@/lib/api-client';
 
 interface ChatState {
   sessionId: string | null;
@@ -22,6 +23,7 @@ interface ChatState {
   endStream: () => void;
   addUserMessage: (content: string) => void;
   setSession: (sessionId: string, agentId: string) => void;
+  loadHistory: (sessionId: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -305,6 +307,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
       webviewContent: null,
       error: null,
     });
+  },
+
+  loadHistory: async (sessionId: string) => {
+    const { messages } = await apiClient.getSessionHistory(sessionId);
+    if (messages.length === 0) return;
+    const timeline: ChatEntry[] = messages.map((m) => ({
+      type: 'message' as const,
+      message: {
+        id: genId(),
+        role: m.role,
+        content: m.content,
+        timestamp: Date.now(),
+      },
+    }));
+    set({ timeline });
   },
 
   reset: () => {

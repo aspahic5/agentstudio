@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router';
-import { LayoutGrid, LogOut, X } from 'lucide-react';
+import { LayoutGrid, LogOut, X, Wrench } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { cn } from '@/lib/utils';
 
@@ -10,6 +10,7 @@ interface SidebarProps {
 
 const navItems = [
   { to: '/agents', label: 'Agents', icon: LayoutGrid },
+  { to: '/tools', label: 'Tools', icon: Wrench },
 ];
 
 export function Sidebar({ open, onClose }: SidebarProps) {

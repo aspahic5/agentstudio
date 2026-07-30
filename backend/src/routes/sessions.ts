@@ -8,6 +8,7 @@ import { sessionRepository } from '../repositories/SessionRepository.js';
 import { nodeRepository } from '../repositories/NodeRepository.js';
 import { toolDefinitionRepository } from '../repositories/ToolDefinitionRepository.js';
 import { processMessage } from '../engine/engineOrchestrator.js';
+import { snapshotRepository } from '../engine/snapshotRepository.js';
 import { LiteLLMService } from '../engine/llm/liteLLMService.js';
 import { config } from '../config.js';
 import type {
@@ -22,14 +23,17 @@ type ToolDefinitionRow = typeof toolDefinitions.$inferSelect;
 
 function parseNodeRow(row: AgentNodeRow): AgentNode {
   const nodeConfig = (row.configJson ?? {}) as Record<string, unknown>;
+  const nodeType = row.nodeType as AgentNode['nodeType'];
   return {
     id: row.id,
     agentId: row.agentId,
     name: row.name,
-    nodeType: row.nodeType as AgentNode['nodeType'],
+    nodeType,
     semanticAgentConfigId: row.semanticAgentConfigId ?? '',
     phaseLabel: row.phaseLabel,
     progressWeight: row.progressWeight,
+    ...(nodeType === 'conversation' && { maxStepsPerTurn: 5 }),
+    ...(nodeType === 'agentic' && { maxSteps: 10 }),
     ...nodeConfig,
   } as AgentNode;
 }
@@ -99,6 +103,33 @@ export default async function sessionRoutes(app: FastifyInstance) {
     const agent = await agentRepository.findById(agentId);
     if (!agent) return reply.code(404).send({ error: 'Agent not found' });
     return sessionRepository.listByAgentAndUser(agentId, request.user.id);
+  });
+
+  app.get('/sessions/:sessionId/history', async (request, reply) => {
+    const { sessionId } = request.params as { sessionId: string };
+    const session = await sessionRepository.findById(sessionId);
+    if (!session) return reply.code(404).send({ error: 'Session not found' });
+    if (session.userId !== request.user.id) {
+      return reply.code(403).send({ error: 'Not authorized' });
+    }
+    const snapshot = await snapshotRepository.load(sessionId);
+    if (!snapshot) return reply.send({ messages: [] });
+
+    const engine = (snapshot.context.data?._engine as Record<string, unknown> | undefined);
+    const conversation = engine?.conversation as Record<string, unknown> | undefined;
+    const responses = (conversation?.responses ?? []) as Array<{
+      turn: number;
+      userMessage: string;
+      assistantMessage: string;
+    }>;
+
+    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+    for (const r of responses) {
+      if (r.userMessage) messages.push({ role: 'user', content: r.userMessage });
+      messages.push({ role: 'assistant', content: r.assistantMessage });
+    }
+
+    return reply.send({ messages });
   });
 
   app.delete('/sessions/:sessionId', async (request, reply) => {

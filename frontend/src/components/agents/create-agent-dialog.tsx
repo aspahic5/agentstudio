@@ -19,7 +19,6 @@ export function CreateAgentDialog() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [initialNodeId, setInitialNodeId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,12 +30,10 @@ export function CreateAgentDialog() {
       await createAgent({
         name,
         description: description || undefined,
-        initialNodeId,
       });
       setOpen(false);
       setName('');
       setDescription('');
-      setInitialNodeId('');
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -71,15 +68,6 @@ export function CreateAgentDialog() {
               id="agent-desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="agent-node">Initial Node ID</Label>
-            <Input
-              id="agent-node"
-              value={initialNodeId}
-              onChange={(e) => setInitialNodeId(e.target.value)}
-              required
             />
           </div>
           {error && <p className="text-sm text-error">{error}</p>}

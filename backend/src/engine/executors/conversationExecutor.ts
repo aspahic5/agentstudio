@@ -25,7 +25,6 @@ import {
 } from '../toolCallCache.js';
 import { applyContextWindow, type WindowedHistory } from '../contextWindow.js';
 import {
-  buildPhaseStartChunk,
   buildTextChunk,
   buildThinkingChunk,
 } from '../chunkBuilders.js';
@@ -48,9 +47,21 @@ function buildStepPrompt(
   windowedHistory: WindowedHistory,
   userMessage: string,
   turnToolResults: Array<{ toolName: string; parameters: Record<string, unknown>; result: unknown }>,
-  forceDirective: string | null
+  forceDirective: string | null,
+  toolDescriptions: string,
 ): string {
   const parts: string[] = [];
+
+  parts.push('## Available Tools');
+  parts.push(toolDescriptions);
+  parts.push('');
+  parts.push('## Response Format');
+  parts.push('You MUST respond with a single JSON object and nothing else:');
+  parts.push('```json');
+  parts.push('{ "toolName": "<tool name>", "parameters": { ... } }');
+  parts.push('```');
+  parts.push('Pick exactly one tool to call. Do not include any text outside the JSON.');
+  parts.push('');
 
   if (windowedHistory.olderTurnsCount > 0) {
     if (windowedHistory.appliedStrategy === 'drop') {
@@ -95,8 +106,13 @@ function buildStepPrompt(
     parts.push('');
   }
 
-  parts.push('## Current User Message');
-  parts.push(userMessage);
+  if (userMessage === '') {
+    parts.push('## Instruction');
+    parts.push('This is the start of the conversation. Greet the user and ask your opening question to begin working toward the goal.');
+  } else {
+    parts.push('## Current User Message');
+    parts.push(userMessage);
+  }
 
   if (forceDirective) {
     parts.push('');
@@ -139,29 +155,11 @@ export class ConversationExecutorImpl implements IConversationExecutor {
   async *executeEntry(
     node: ConversationNode,
     context: ConversationContext,
-    _deps: ExecutorDependencies
+    deps: ExecutorDependencies
   ): AsyncGenerator<EngineStreamChunk, ConversationResult> {
-    yield buildPhaseStartChunk(node.phaseLabel, node.name);
-
-    const reEntryFeedback = node.reEntryContextKey ? context.data[node.reEntryContextKey] : undefined;
-    const mode = context.data.mode as string | undefined;
-    const chooseModeTransition = mode === 'new' || mode === 'edit' || mode === 'select';
-
-    let goalMessage: string;
-    if (reEntryFeedback) {
-      goalMessage =
-        `Resuming conversation. Feedback from previous step:\n\n` +
-        `${typeof reEntryFeedback === 'string' ? reEntryFeedback : JSON.stringify(reEntryFeedback, null, 2)}` +
-        `\n\nGoal: ${node.goalDescription}`;
-    } else {
-      goalMessage = node.goalDescription;
-    }
-
-    if (!chooseModeTransition || reEntryFeedback) {
-      yield buildTextChunk(goalMessage);
-    }
-
-    return { type: 'presentation', response: goalMessage, contextUpdates: {} };
+    // Use the LLM to generate a proper opening message rather than showing
+    // the raw goalDescription (which is an internal instruction, not user-facing).
+    return yield* this.executeInput(node, context, '', deps);
   }
 
   async *executeInput(
@@ -230,7 +228,7 @@ export class ConversationExecutorImpl implements IConversationExecutor {
       const forceDirective = isForceStep
         ? '**STEP LIMIT REACHED. You MUST call respond_to_user or complete_conversation NOW. Do not call any other tool.**'
         : null;
-      const stepPrompt = buildStepPrompt(windowedHistory, userMessage, turnToolResults, forceDirective);
+      const stepPrompt = buildStepPrompt(windowedHistory, userMessage, turnToolResults, forceDirective, allToolDescriptions);
 
       if (step === 0) deps.loopDetector.checkPrompt(node.id, stepPrompt);
 

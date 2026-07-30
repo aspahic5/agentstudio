@@ -14,7 +14,6 @@ export class AgentRepository {
   async create(data: {
     name: string;
     description: string;
-    initialNodeId: string;
     createdBy: string;
     inputContract?: unknown;
     metadata?: unknown;
@@ -24,7 +23,6 @@ export class AgentRepository {
       id,
       name: data.name,
       description: data.description,
-      initialNodeId: data.initialNodeId,
       createdBy: data.createdBy,
       inputContract: data.inputContract,
       metadata: data.metadata ?? {},
@@ -35,7 +33,7 @@ export class AgentRepository {
   async update(id: string, data: {
     name?: string;
     description?: string;
-    initialNodeId?: string;
+    initialNodeId?: string | null;
     inputContract?: unknown;
     metadata?: unknown;
   }) {

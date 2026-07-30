@@ -1,6 +1,6 @@
-import { and, eq, desc } from 'drizzle-orm';
+import { and, eq, desc, sql } from 'drizzle-orm';
 import { db } from '../db/drizzle.js';
-import { sessions } from '../db/schema.js';
+import { sessions, sessionSnapshots } from '../db/schema.js';
 
 export class SessionRepository {
   async create(data: { agentId: string; version: string; userId: string }) {
@@ -19,10 +19,24 @@ export class SessionRepository {
   }
 
   async listByAgentAndUser(agentId: string, userId: string) {
-    return db.query.sessions.findMany({
-      where: and(eq(sessions.agentId, agentId), eq(sessions.userId, userId)),
-      orderBy: desc(sessions.createdAt),
-    });
+    const rows = await db
+      .select({
+        id: sessions.id,
+        agentId: sessions.agentId,
+        version: sessions.version,
+        userId: sessions.userId,
+        status: sessions.status,
+        createdAt: sessions.createdAt,
+        updatedAt: sessions.updatedAt,
+        hasSnapshot: sql<boolean>`(EXISTS (
+          SELECT 1 FROM session_snapshots
+          WHERE session_snapshots.session_id = sessions.id
+        ))`,
+      })
+      .from(sessions)
+      .where(and(eq(sessions.agentId, agentId), eq(sessions.userId, userId)))
+      .orderBy(desc(sessions.createdAt));
+    return rows;
   }
 
   async delete(id: string) {

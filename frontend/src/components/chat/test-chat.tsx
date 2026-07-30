@@ -7,6 +7,9 @@ import { MessageList } from './message-list';
 import { ChatInput } from './chat-input';
 import { OptionsSelector } from './options-selector';
 
+// Prevents StrictMode double-invocation from creating two sessions.
+const initializingAgents = new Set<string>();
+
 interface TestChatProps {
   agentId: string;
 }
@@ -28,16 +31,19 @@ export function TestChat({ agentId }: TestChatProps) {
     thinkingState,
     currentOptions,
     setSession,
+    loadHistory,
     addUserMessage,
     reset,
   } = useChatStore();
 
   const { sendMessage } = useSSEStream(activeSessionId);
-  const initializedRef = useRef(false);
+  const sendMessageRef = useRef(sendMessage);
+  sendMessageRef.current = sendMessage;
 
-  // Load sessions and auto-create if none exist
+  // Load sessions on mount — no auto-start.
   useEffect(() => {
-    let cancelled = false;
+    if (initializingAgents.has(agentId)) return;
+    initializingAgents.add(agentId);
 
     async function init() {
       await fetchSessions(agentId);
@@ -45,43 +51,40 @@ export function TestChat({ agentId }: TestChatProps) {
 
       if (store.sessions.length === 0) {
         const session = await createSession(agentId);
-        if (!cancelled) {
-          setSession(session.id, agentId);
-        }
+        setSession(session.id, agentId);
       } else if (!store.activeSessionId) {
-        const firstId = store.sessions[0].id;
-        setActiveSession(firstId);
-        if (!cancelled) {
-          setSession(firstId, agentId);
+        const first = store.sessions[0];
+        setActiveSession(first.id);
+        setSession(first.id, agentId);
+        if (first.hasSnapshot) {
+          await loadHistory(first.id);
         }
       }
     }
 
-    init();
-    return () => { cancelled = true; };
-  }, [agentId, fetchSessions, createSession, setActiveSession, setSession]);
+    init().finally(() => initializingAgents.delete(agentId));
+  }, [agentId, fetchSessions, createSession, setActiveSession, setSession, loadHistory]);
 
-  // Auto-start pipeline when session changes
+  // Refresh session list after stream ends so hasSnapshot reflects reality.
+  const prevIsStreamingRef = useRef(false);
   useEffect(() => {
-    if (!activeSessionId) return;
-    if (initializedRef.current) return;
-    initializedRef.current = true;
+    if (prevIsStreamingRef.current && !isStreaming) {
+      fetchSessions(agentId);
+    }
+    prevIsStreamingRef.current = isStreaming;
+  }, [isStreaming, agentId, fetchSessions]);
 
-    setSession(activeSessionId, agentId);
-    sendMessage(null);
-  }, [activeSessionId, agentId, setSession, sendMessage]);
+  const handleStart = useCallback(() => {
+    sendMessageRef.current(null);
+  }, []);
 
   const handleNewSession = useCallback(async () => {
-    initializedRef.current = false;
     reset();
     const session = await createSession(agentId);
     setSession(session.id, agentId);
-    sendMessage(null);
-    initializedRef.current = true;
-  }, [agentId, createSession, setSession, reset, sendMessage]);
+  }, [agentId, createSession, setSession, reset]);
 
   const handleDeleteSession = useCallback(async (sessionId: string) => {
-    initializedRef.current = false;
     reset();
     await deleteSession(sessionId);
 
@@ -89,22 +92,21 @@ export function TestChat({ agentId }: TestChatProps) {
     if (store.sessions.length === 0) {
       const session = await createSession(agentId);
       setSession(session.id, agentId);
-      sendMessage(null);
-      initializedRef.current = true;
     } else if (store.activeSessionId) {
       setSession(store.activeSessionId, agentId);
-      sendMessage(null);
-      initializedRef.current = true;
     }
-  }, [agentId, deleteSession, createSession, setSession, reset, sendMessage]);
+  }, [agentId, deleteSession, createSession, setSession, reset]);
 
-  const handleSelectSession = useCallback((sessionId: string) => {
-    initializedRef.current = false;
+  const handleSelectSession = useCallback(async (sessionId: string) => {
     reset();
     setActiveSession(sessionId);
     setSession(sessionId, agentId);
-    initializedRef.current = true;
-  }, [setActiveSession, setSession, agentId, reset]);
+    const store = useSessionStore.getState();
+    const session = store.sessions.find(s => s.id === sessionId);
+    if (session?.hasSnapshot) {
+      await loadHistory(sessionId);
+    }
+  }, [setActiveSession, setSession, agentId, reset, loadHistory]);
 
   const handleSendMessage = useCallback((text: string) => {
     addUserMessage(text);
@@ -116,6 +118,12 @@ export function TestChat({ agentId }: TestChatProps) {
     addUserMessage(message);
     sendMessage(message);
   }, [addUserMessage, sendMessage]);
+
+  const activeSession = sessions.find(s => s.id === activeSessionId);
+  const conversationActive = isStreaming || timeline.length > 0;
+  const showStartButton = !!activeSession && !activeSession.hasSnapshot && !conversationActive;
+  const showContinueNotice = !!activeSession && activeSession.hasSnapshot && !conversationActive;
+
 
   return (
     <div className="flex flex-col h-full">
@@ -134,6 +142,28 @@ export function TestChat({ agentId }: TestChatProps) {
         isStreaming={isStreaming}
       />
 
+      {showStartButton && (
+        <div className="flex items-center justify-center p-8">
+          <button
+            onClick={handleStart}
+            className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
+          >
+            Start Conversation
+          </button>
+        </div>
+      )}
+
+      {showContinueNotice && (
+        <div className="flex items-center justify-center p-8">
+          <button
+            onClick={handleStart}
+            className="px-6 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors"
+          >
+            Continue Conversation
+          </button>
+        </div>
+      )}
+
       {currentOptions && (
         <OptionsSelector
           options={currentOptions}
@@ -143,7 +173,7 @@ export function TestChat({ agentId }: TestChatProps) {
 
       <ChatInput
         onSend={handleSendMessage}
-        disabled={isStreaming || !!currentOptions}
+        disabled={isStreaming || !!currentOptions || showStartButton || showContinueNotice}
       />
     </div>
   );

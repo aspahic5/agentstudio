@@ -9,6 +9,7 @@ import { EditorTestChat } from '@/components/editor/editor-test-chat';
 import { EditorToolbar } from '@/components/editor/editor-toolbar';
 import { NodeConfigPanel } from '@/components/editor/node-config-panel';
 import { AIEditorPanel } from '@/components/editor/ai-editor/ai-editor-panel';
+import { AgentSettingsPanel } from '@/components/editor/agent-settings-panel';
 
 export function EditorPage() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -20,6 +21,7 @@ export function EditorPage() {
   const agent = useFlowStore((s) => s.agent);
   const selectedNodeId = useFlowStore((s) => s.selectedNodeId);
   const aiEditorOpen = useAIEditorStore((s) => s.isOpen);
+  const agentSettingsOpen = useFlowStore((s) => s.agentSettingsOpen);
 
   useEffect(() => {
     if (agentId) {
@@ -57,6 +59,7 @@ export function EditorPage() {
       </div>
       {selectedNodeId && <NodeConfigPanel />}
       {aiEditorOpen && <AIEditorPanel />}
+      {agentSettingsOpen && <AgentSettingsPanel />}
       {testChatOpen && agentId && (
         <EditorTestChat agentId={agentId} onClose={() => setTestChatOpen(false)} />
       )}

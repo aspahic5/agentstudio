@@ -5,6 +5,8 @@ import { useChatStore } from '@/stores/chat-store';
 
 export function useSSEStream(sessionId: string | null) {
   const abortRef = useRef<AbortController | null>(null);
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
   const { processStreamEvent, startStream, isStreaming } = useChatStore();
 
   const abort = useCallback(() => {
@@ -14,7 +16,11 @@ export function useSSEStream(sessionId: string | null) {
 
   const sendMessage = useCallback(
     async (message: string | null, initialContext?: Record<string, unknown>) => {
+      const sessionId = sessionIdRef.current;
       if (!sessionId) return;
+
+      // For auto-start (null message), don't interrupt an already-running stream.
+      if (message === null && abortRef.current) return;
 
       abort();
       startStream();

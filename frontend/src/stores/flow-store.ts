@@ -13,6 +13,7 @@ import type { AIEditOperation } from '@/types/ai-editor';
 import { apiClient } from '@/lib/api-client';
 import { deriveEdges } from '@/lib/edge-derivation';
 import { getDefaultConfigJson, nodeTypeNeedsSaConfig } from '@/lib/node-type-meta';
+import { useAIEditorStore } from './ai-editor-store';
 
 interface FlowState {
   // Agent context
@@ -52,6 +53,12 @@ interface FlowState {
   updateNode: (nodeId: string, updates: Partial<EditorAgentNode>) => void;
   removeNode: (nodeId: string) => void;
   selectNode: (nodeId: string | null) => void;
+
+  // Actions — agent settings
+  agentSettingsOpen: boolean;
+  openAgentSettings: () => void;
+  closeAgentSettings: () => void;
+  updateAgentSettings: (updates: { initialNodeId?: string; description?: string }) => Promise<void>;
 
   // Actions — SA config management
   updateSaConfig: (configId: string, updates: Partial<EditorSaConfig>) => void;
@@ -115,8 +122,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       const agent = await apiClient.getAgent(agentId);
       set({ agent });
       await get().loadVersions();
-      if (agent.currentVersion) {
-        await get().loadVersionData(agent.currentVersion);
+      const { versions } = get();
+      const versionToLoad = agent.currentVersion ?? versions[0]?.version ?? null;
+      if (versionToLoad) {
+        await get().loadVersionData(versionToLoad);
       }
     } catch (err) {
       set({ error: (err as Error).message });
@@ -339,7 +348,29 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({
       selectedNodeId: nodeId,
       rfNodes: buildRfNodes(agentNodes, nodeId, get().nodeHighlights),
+      ...(nodeId ? { agentSettingsOpen: false } : {}),
     });
+  },
+
+  agentSettingsOpen: false,
+
+  openAgentSettings: () => {
+    set({ agentSettingsOpen: true, selectedNodeId: null });
+    useAIEditorStore.getState().close();
+  },
+
+  closeAgentSettings: () => set({ agentSettingsOpen: false }),
+
+  updateAgentSettings: async (updates) => {
+    const { agentId, agent } = get();
+    if (!agentId || !agent) return;
+    try {
+      await apiClient.updateAgent(agentId, updates);
+      set({ agent: { ...agent, ...updates } });
+    } catch (err) {
+      set({ error: (err as Error).message });
+      throw err;
+    }
   },
 
   updateSaConfig: (configId: string, updates: Partial<EditorSaConfig>) => {
@@ -620,6 +651,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       rfNodes: [],
       rfEdges: [],
       selectedNodeId: null,
+      agentSettingsOpen: false,
       isDirty: false,
       isLoading: false,
       isSaving: false,

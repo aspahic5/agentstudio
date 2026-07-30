@@ -12,7 +12,6 @@ const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 const createAgentSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(2000).default(''),
-  initialNodeId: z.string().min(1).max(200),
   inputContract: z.unknown().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });

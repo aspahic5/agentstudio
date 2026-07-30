@@ -39,17 +39,23 @@ export function ReviewConfig({ nodeId, config, onChange }: ReviewConfigProps) {
   // --- Intent Management ---
   function addIntent() {
     const name = `intent_${validIntents.length + 1}`;
-    update('validIntents', [...validIntents, name]);
-    update('transitions', { ...transitions, [name]: { target: '', actions: [] } });
+    onChange({
+      ...config,
+      validIntents: [...validIntents, name],
+      transitions: { ...transitions, [name]: { target: '', actions: [] } },
+    });
   }
 
   function removeIntent(intent: string) {
-    update('validIntents', validIntents.filter((i) => i !== intent));
     const { [intent]: _, ...rest } = transitions;
-    update('transitions', rest);
     const { [intent]: __, ...restTemplates } = responseTemplates;
-    update('responseTemplates', restTemplates);
-    update('modificationIntents', modificationIntents.filter((i) => i !== intent));
+    onChange({
+      ...config,
+      validIntents: validIntents.filter((i) => i !== intent),
+      transitions: rest,
+      responseTemplates: restTemplates,
+      modificationIntents: modificationIntents.filter((i) => i !== intent),
+    });
   }
 
   function renameIntent(oldName: string, newName: string) {

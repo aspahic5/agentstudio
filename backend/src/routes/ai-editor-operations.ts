@@ -152,7 +152,7 @@ export const suggestRequestSchema = z.object({
   agent: z.object({
     id: z.string(),
     name: z.string(),
-    initialNodeId: z.string(),
+    initialNodeId: z.string().nullable().optional(),
     description: z.string().optional(),
   }),
   nodes: z.array(

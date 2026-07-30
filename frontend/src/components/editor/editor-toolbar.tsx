@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, Save, ChevronDown, Sparkles } from 'lucide-react';
+import { ArrowLeft, Save, ChevronDown, Sparkles, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,6 +29,10 @@ export function EditorToolbar() {
   const aiEditorOpen = useAIEditorStore((s) => s.isOpen);
   const openAIEditor = useAIEditorStore((s) => s.open);
   const closeAIEditor = useAIEditorStore((s) => s.close);
+
+  const agentSettingsOpen = useFlowStore((s) => s.agentSettingsOpen);
+  const openAgentSettings = useFlowStore((s) => s.openAgentSettings);
+  const closeAgentSettings = useFlowStore((s) => s.closeAgentSettings);
 
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -104,11 +108,29 @@ export function EditorToolbar() {
 
         <div className="flex-1" />
 
+        {/* Agent Settings */}
+        <Button
+          size="sm"
+          variant={agentSettingsOpen ? 'default' : 'ghost'}
+          onClick={() => (agentSettingsOpen ? closeAgentSettings() : openAgentSettings())}
+          className={cn(agentSettingsOpen && 'bg-primary text-white')}
+        >
+          <Settings size={14} className="mr-1.5" />
+          Settings
+        </Button>
+
         {/* AI Editor */}
         <Button
           size="sm"
           variant={aiEditorOpen ? 'default' : 'ghost'}
-          onClick={() => (aiEditorOpen ? closeAIEditor() : openAIEditor())}
+          onClick={() => {
+            if (aiEditorOpen) {
+              closeAIEditor();
+            } else {
+              openAIEditor();
+              closeAgentSettings();
+            }
+          }}
           className={cn(aiEditorOpen && 'bg-primary text-white')}
         >
           <Sparkles size={14} className="mr-1.5" />

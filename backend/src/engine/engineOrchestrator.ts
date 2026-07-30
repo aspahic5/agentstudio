@@ -24,6 +24,7 @@ import {
 } from './chunkBuilders.js';
 import { ApplicationError } from './errors.js';
 import { snapshotRepository } from './snapshotRepository.js';
+import { redis } from '../db/redis.js';
 import type { LLMProviderStrategy } from './llm/types.js';
 
 export interface OrchestratorConfig {
@@ -112,11 +113,23 @@ export async function* processMessage(
   let actor;
   let context: ConversationContext;
 
+  const isResumed = !!snapshot;
+
   if (snapshot) {
     actor = createActor(machine, { snapshot: snapshot.machineState } as any);
     actor.start();
     context = snapshot.context;
   } else {
+    // Atomic lock: only one request may initialize a new session.
+    // SET NX returns 'OK' if the key was set (we won the lock), null otherwise.
+    const initLockKey = `session:init:${sessionId}`;
+    const locked = await redis.set(initLockKey, '1', 'EX', 30, 'NX');
+    if (!locked) {
+      // Another request is already initializing this session — bail out silently.
+      yield buildTurnCompleteChunk(false, agent.initialNodeId ?? 'unknown', {});
+      return;
+    }
+
     actor = createActor(machine);
     actor.start();
     context = {
@@ -176,6 +189,9 @@ export async function* processMessage(
   let lastEmittedTitleNodeId: string | null = null;
   let hopCounter = 0;
   const maxHops = maxAgentHops ?? 10;
+  // Only skip executeEntry on the very first node of a resumed session.
+  // Nodes entered via transition within the same request must still run executeEntry.
+  let isResumedEntry = isResumed;
 
   while (true) {
     const machineSnap = actor.getSnapshot();
@@ -214,10 +230,13 @@ export async function* processMessage(
         iterResult = await gen.next();
       }
       result = iterResult.value as EntryResult;
+    } else if (currentMessage === null && isResumedEntry && executor.acceptsInput(node)) {
+      yield buildTurnCompleteChunk(false, currentNodeId, context.data);
+      return;
     } else {
       if (currentNodeId !== previousNodeId) {
-        yield buildPhaseStartChunk(node.phaseLabel, node.name, nodeMap.size);
         if (currentNodeId !== lastEmittedTitleNodeId) {
+          yield buildPhaseStartChunk(node.phaseLabel, node.name, nodeMap.size);
           yield buildNodeTitleChunk(node.id, node.name, node.phaseLabel, node.description);
           lastEmittedTitleNodeId = currentNodeId;
         }
@@ -378,5 +397,6 @@ export async function* processMessage(
     }
 
     if (messageConsumed) currentMessage = null;
+    isResumedEntry = false;
   }
 }

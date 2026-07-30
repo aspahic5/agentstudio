@@ -100,11 +100,4 @@ export function validateAgentGraph(agent: AgentDefinition, nodes: AgentNode[]): 
     }
   }
 
-  const hasRouting = nodes.some((n) => n.nodeType === 'routing');
-  if (!hasRouting) {
-    throw new ApplicationError(
-      `Agent "${agent.id}": no routing node found - agent cannot complete`,
-      { code: 'VALIDATION_ERROR', statusCode: 400, context: { agentId: agent.id } }
-    );
-  }
 }

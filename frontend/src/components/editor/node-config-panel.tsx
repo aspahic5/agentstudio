@@ -1,13 +1,54 @@
 import { X, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { useFlowStore } from '@/stores/flow-store';
 import { NODE_TYPE_META, nodeTypeNeedsSaConfig } from '@/lib/node-type-meta';
 import { SaConfigPanel } from './sa-config-panel';
+import {
+  ConversationConfig,
+  GenerationConfig,
+  IntentParsingConfig,
+  RoutingConfig,
+  ReviewConfig,
+  ToolConfig,
+  AgenticConfig,
+  ComputeConfig,
+} from './config-forms';
+import type { EditorNodeType } from '@/types/editor';
+
+function NodeTypeConfigForm({
+  nodeId,
+  nodeType,
+  config,
+  onChange,
+}: {
+  nodeId: string;
+  nodeType: EditorNodeType;
+  config: Record<string, unknown>;
+  onChange: (config: Record<string, unknown>) => void;
+}) {
+  switch (nodeType) {
+    case 'conversation':
+      return <ConversationConfig nodeId={nodeId} config={config} onChange={onChange} />;
+    case 'generation':
+      return <GenerationConfig nodeId={nodeId} config={config} onChange={onChange} />;
+    case 'intent_parsing':
+      return <IntentParsingConfig nodeId={nodeId} config={config} onChange={onChange} />;
+    case 'routing':
+      return <RoutingConfig nodeId={nodeId} config={config} onChange={onChange} />;
+    case 'review':
+      return <ReviewConfig nodeId={nodeId} config={config} onChange={onChange} />;
+    case 'tool':
+      return <ToolConfig nodeId={nodeId} config={config} onChange={onChange} />;
+    case 'agentic':
+      return <AgenticConfig nodeId={nodeId} config={config} onChange={onChange} />;
+    case 'compute':
+      return <ComputeConfig nodeId={nodeId} config={config} onChange={onChange} />;
+  }
+}
 
 export function NodeConfigPanel() {
   const selectedNodeId = useFlowStore((s) => s.selectedNodeId);
@@ -30,15 +71,6 @@ export function NodeConfigPanel() {
   const nodeConfigs = Array.from(saConfigs.values()).filter((c) => c.nodeId === selectedNodeId);
   const primaryConfig = nodeConfigs.find((c) => c.id === node.semanticAgentConfigId);
   const secondaryConfigs = nodeConfigs.filter((c) => c.id !== node.semanticAgentConfigId);
-
-  function handleUpdateConfigJson(json: string) {
-    try {
-      const parsed = JSON.parse(json);
-      updateNode(selectedNodeId!, { configJson: parsed });
-    } catch {
-      // Allow typing invalid JSON temporarily
-    }
-  }
 
   return (
     <div className="w-96 border-l border-border-light bg-white flex flex-col shrink-0">
@@ -108,15 +140,13 @@ export function NodeConfigPanel() {
                 />
               </div>
 
-              {/* Per-type config form: JSON editor for configJson */}
-              <div className="space-y-1.5">
-                <Label className="text-xs">Config JSON</Label>
-                <Textarea
-                  value={JSON.stringify(node.configJson ?? {}, null, 2)}
-                  onChange={(e) => handleUpdateConfigJson(e.target.value)}
-                  className="text-sm font-mono min-h-[200px]"
-                />
-              </div>
+              {/* Node-type specific config form */}
+              <NodeTypeConfigForm
+                nodeId={selectedNodeId!}
+                nodeType={node.nodeType}
+                config={(node.configJson ?? {}) as Record<string, unknown>}
+                onChange={(configJson) => updateNode(selectedNodeId!, { configJson })}
+              />
             </div>
           </ScrollArea>
         </TabsContent>

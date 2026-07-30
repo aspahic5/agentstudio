@@ -550,7 +550,6 @@ Before returning operations, verify:
 2. All transition targets ("target" in transition rules) must reference existing node IDs, or be the literal strings "self" or "complete".
 3. All "targetNodeId" fields in generation, tool, agentic, compute, and conversation nodes must reference existing node IDs.
 4. All routing rule node targets ("nodeId" in target objects with type "node") must reference existing node IDs.
-5. The pipeline must contain at least one routing node after all operations are applied.
 6. agentic and conversation nodes must have a non-empty "outputSchema" in their configJson.
 7. review nodes must have both a primary SA config and a second SA config whose "name" matches the "refinementStateName" field in the node's configJson.
 
