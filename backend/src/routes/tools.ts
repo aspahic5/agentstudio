@@ -40,11 +40,17 @@ function validateParametersSchema(schema: unknown): void {
   }
 }
 
+function redactHeaders<T extends { headers: unknown }>(tool: T): Omit<T, 'headers'> & { headers: null } {
+  return { ...tool, headers: null };
+}
+
 export default async function toolRoutes(app: FastifyInstance) {
   app.addHook('onRequest', authenticate);
 
-  app.get('/', async () => {
-    return toolDefinitionRepository.list();
+  app.get('/', async (request) => {
+    const tools = await toolDefinitionRepository.list();
+    if (request.user.role === 'admin') return tools;
+    return tools.map(redactHeaders);
   });
 
   app.post('/', { onRequest: [requireAdmin] }, async (request, reply) => {

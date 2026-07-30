@@ -20,7 +20,10 @@ export interface LoopDetectorConfig {
 }
 
 export const DEFAULT_LOOP_DETECTOR_CONFIG: LoopDetectorConfig = {
-  maxNodeExecutions: 0,
+  // Hard cap: a single processMessage() call may not execute more than this
+  // many nodes total. 0 disabled the cap; 200 is generous for any realistic
+  // pipeline while bounding worst-case runaway execution.
+  maxNodeExecutions: 200,
   identicalPromptThreshold: 2,
   judgeActivationThreshold: 20,
   minJudgeCheckInterval: 5,

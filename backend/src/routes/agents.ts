@@ -73,8 +73,11 @@ export default async function agentRoutes(app: FastifyInstance) {
 
   // --- Agent CRUD ---
 
-  app.get('/', async () => {
-    return agentRepository.list();
+  app.get('/', async (request) => {
+    if (request.user.role === 'admin') {
+      return agentRepository.listAll();
+    }
+    return agentRepository.list(request.user.id);
   });
 
   app.post('/', async (request, reply) => {
@@ -118,6 +121,9 @@ export default async function agentRoutes(app: FastifyInstance) {
     const { agentId } = request.params as { agentId: string };
     const agent = await agentRepository.findById(agentId);
     if (!agent) return reply.code(404).send({ error: 'Agent not found' });
+    if (agent.createdBy !== request.user.id && request.user.role !== 'admin') {
+      return reply.code(403).send({ error: 'Not authorized' });
+    }
     return versionRepository.list(agentId);
   });
 
@@ -126,6 +132,9 @@ export default async function agentRoutes(app: FastifyInstance) {
     if (!SEMVER_RE.test(version)) return reply.code(400).send({ error: 'Invalid version format' });
     const agent = await agentRepository.findById(agentId);
     if (!agent) return reply.code(404).send({ error: 'Agent not found' });
+    if (agent.createdBy !== request.user.id && request.user.role !== 'admin') {
+      return reply.code(403).send({ error: 'Not authorized' });
+    }
     const versionRecord = await versionRepository.findByAgentVersion(agentId, version);
     if (!versionRecord) return reply.code(404).send({ error: 'Version not found' });
     const nodes = await nodeRepository.findByAgentVersion(agentId, version);
@@ -138,6 +147,9 @@ export default async function agentRoutes(app: FastifyInstance) {
     const body = parseBody(saveNewVersionSchema, request.body);
     const agent = await agentRepository.findById(agentId);
     if (!agent) return reply.code(404).send({ error: 'Agent not found' });
+    if (agent.createdBy !== request.user.id && request.user.role !== 'admin') {
+      return reply.code(403).send({ error: 'Not authorized' });
+    }
     await versionRepository.saveNewVersion(agentId, body.version, body.label, body.nodes, body.saConfigs);
     return reply.code(201).send({ version: body.version });
   });
@@ -148,6 +160,9 @@ export default async function agentRoutes(app: FastifyInstance) {
     const body = parseBody(overwriteVersionSchema, request.body);
     const agent = await agentRepository.findById(agentId);
     if (!agent) return reply.code(404).send({ error: 'Agent not found' });
+    if (agent.createdBy !== request.user.id && request.user.role !== 'admin') {
+      return reply.code(403).send({ error: 'Not authorized' });
+    }
     await versionRepository.overwriteVersion(agentId, version, body.nodes, body.saConfigs);
     return { version };
   });
@@ -158,6 +173,9 @@ export default async function agentRoutes(app: FastifyInstance) {
     const body = parseBody(updateLabelSchema, request.body);
     const agent = await agentRepository.findById(agentId);
     if (!agent) return reply.code(404).send({ error: 'Agent not found' });
+    if (agent.createdBy !== request.user.id && request.user.role !== 'admin') {
+      return reply.code(403).send({ error: 'Not authorized' });
+    }
     return versionRepository.updateLabel(agentId, version, body.label);
   });
 
@@ -166,6 +184,9 @@ export default async function agentRoutes(app: FastifyInstance) {
     if (!SEMVER_RE.test(version)) return reply.code(400).send({ error: 'Invalid version format' });
     const agent = await agentRepository.findById(agentId);
     if (!agent) return reply.code(404).send({ error: 'Agent not found' });
+    if (agent.createdBy !== request.user.id && request.user.role !== 'admin') {
+      return reply.code(403).send({ error: 'Not authorized' });
+    }
     await versionRepository.deleteVersion(agentId, version);
     return reply.code(204).send();
   });

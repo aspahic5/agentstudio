@@ -132,13 +132,28 @@ export async function* processMessage(
 
     actor = createActor(machine);
     actor.start();
+
+    // Strip reserved engine-internal keys from caller-supplied initialContext.
+    // Allowing callers to seed _engine, _agentId, credentials, or env would
+    // let them overwrite engine state or inject credential material into the
+    // interpolation context before the engine has a chance to set those keys.
+    const RESERVED_CONTEXT_KEYS = new Set(['_engine', '_agentId', '_reasoning', 'credentials', 'env']);
+    const sanitizedInitialContext: Record<string, unknown> = {};
+    if (initialContext) {
+      for (const [k, v] of Object.entries(initialContext)) {
+        if (!RESERVED_CONTEXT_KEYS.has(k)) {
+          sanitizedInitialContext[k] = v;
+        }
+      }
+    }
+
     context = {
       sessionId,
       userId,
       currentNodeId: agent.initialNodeId,
       conversationHistory: [],
       userProfile: userProfile ?? null,
-      data: initialContext ? { ...initialContext } : {},
+      data: sanitizedInitialContext,
     };
   }
 

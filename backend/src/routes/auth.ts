@@ -110,4 +110,9 @@ export default async function authRoutes(app: FastifyInstance) {
     const tokens = await generateTokens(user);
     return tokens;
   });
+
+  app.post('/logout', { onRequest: [authenticate] }, async (request, reply) => {
+    await userRepository.deleteAllRefreshTokens(request.user.id);
+    return reply.code(204).send();
+  });
 }

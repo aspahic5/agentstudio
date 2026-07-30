@@ -283,7 +283,11 @@ export function applyOperations(
         const idx = result.nodes.findIndex((n) => n.id === op.nodeId);
         if (idx === -1) break;
 
-        const { configJson: incomingConfigJson, ...rest } = op.changes as {
+        // Destructure out identity fields that must never be overwritten, plus configJson
+        // which gets special merge treatment below.
+        const { id: _id, agentId: _agentId, configJson: incomingConfigJson, ...rest } = op.changes as {
+          id?: unknown;
+          agentId?: unknown;
           configJson?: Record<string, unknown>;
           [key: string]: unknown;
         };
@@ -322,7 +326,14 @@ export function applyOperations(
       case 'update_sa_config': {
         const idx = result.saConfigs.findIndex((s) => s.nodeId === op.nodeId);
         if (idx === -1) break;
-        Object.assign(result.saConfigs[idx], op.changes);
+        // Strip identity fields that must never be overwritten via an update operation.
+        const { id: _id, nodeId: _nodeId, agentId: _agentId, ...saChanges } = op.changes as {
+          id?: unknown;
+          nodeId?: unknown;
+          agentId?: unknown;
+          [key: string]: unknown;
+        };
+        Object.assign(result.saConfigs[idx], saChanges);
         break;
       }
 

@@ -26,7 +26,9 @@ export const refreshTokens = pgTable('refresh_tokens', {
   tokenHash: text('token_hash').notNull().unique(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [
+  index('idx_refresh_tokens_user_id').on(t.userId),
+]);
 
 // ============================================================================
 // Agents
@@ -43,7 +45,9 @@ export const agents = pgTable('agents', {
   metadata:       jsonb('metadata').notNull().default({}),
   createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:      timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [
+  index('idx_agents_created_by').on(t.createdBy),
+]);
 
 // ============================================================================
 // Agent Nodes — scoped to (agent_id, version)
@@ -138,7 +142,10 @@ export const sessions = pgTable('sessions', {
   status:    text('status').notNull().default('active'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [
+  index('idx_sessions_user_id').on(t.userId),
+  index('idx_sessions_agent_user').on(t.agentId, t.userId),
+]);
 
 // ============================================================================
 // Session Snapshots — append-only (audit trail)

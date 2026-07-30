@@ -1,3 +1,4 @@
+import * as dns from 'node:dns/promises';
 import type { ToolDefinition } from './types.js';
 import { interpolate } from './interpolate.js';
 import { extractPath } from './applyActions.js';
@@ -18,10 +19,48 @@ const PRIVATE_IP_PATTERNS = [
   /^fe80:/i,
 ];
 
-function isPrivateHost(hostname: string): boolean {
-  if (hostname === 'localhost' || hostname === '[::1]') return true;
-  const bare = hostname.replace(/^\[|\]$/g, '');
+function isPrivateIp(ip: string): boolean {
+  const bare = ip.replace(/^\[|\]$/g, '');
   return PRIVATE_IP_PATTERNS.some((re) => re.test(bare));
+}
+
+function isPrivateHostname(hostname: string): boolean {
+  if (hostname === 'localhost' || hostname === '[::1]') return true;
+  return isPrivateIp(hostname);
+}
+
+// Resolves all IP addresses the hostname maps to and rejects if any resolved
+// address is a private/internal IP. This prevents DNS rebinding attacks where
+// a hostname resolves to a public IP at validation time but an internal IP at
+// request time, or where a public-looking hostname is used to reach 10.x/169.254.x.
+async function assertNotSsrfTarget(hostname: string, toolName: string): Promise<void> {
+  if (isPrivateHostname(hostname)) {
+    throw new ApplicationError(
+      `Tool "${toolName}" attempted to access a private/internal address`,
+      { code: 'VALIDATION_ERROR', statusCode: 400, context: { toolName } }
+    );
+  }
+
+  let addresses: string[];
+  try {
+    const results = await dns.resolve(hostname);
+    addresses = results;
+  } catch {
+    // If DNS resolution fails, we cannot verify safety — block the request.
+    throw new ApplicationError(
+      `Tool "${toolName}" hostname "${hostname}" could not be resolved`,
+      { code: 'VALIDATION_ERROR', statusCode: 400, context: { toolName } }
+    );
+  }
+
+  for (const addr of addresses) {
+    if (isPrivateIp(addr)) {
+      throw new ApplicationError(
+        `Tool "${toolName}" hostname "${hostname}" resolves to a private/internal IP address`,
+        { code: 'VALIDATION_ERROR', statusCode: 400, context: { toolName } }
+      );
+    }
+  }
 }
 
 export async function executeHttpToolCall(
@@ -48,12 +87,7 @@ export async function executeHttpToolCall(
     );
   }
 
-  if (isPrivateHost(parsed.hostname)) {
-    throw new ApplicationError(
-      `Tool "${toolName}" attempted to access a private/internal address`,
-      { code: 'VALIDATION_ERROR', statusCode: 400, context: { toolName } }
-    );
-  }
+  await assertNotSsrfTarget(parsed.hostname, toolName);
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (toolDef.headers) {

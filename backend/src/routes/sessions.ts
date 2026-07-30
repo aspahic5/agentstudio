@@ -65,8 +65,10 @@ function collectToolNames(parsedNodes: AgentNode[]): string[] {
   return Array.from(names);
 }
 
+const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+
 const createSessionSchema = z.object({
-  version: z.string().optional(),
+  version: z.string().regex(SEMVER_RE, 'Version must be semver (e.g. 1.0.0)').optional(),
 });
 
 const messageSchema = z.object({
@@ -83,6 +85,10 @@ export default async function sessionRoutes(app: FastifyInstance) {
 
     const agent = await agentRepository.findById(agentId);
     if (!agent) return reply.code(404).send({ error: 'Agent not found' });
+
+    if (agent.createdBy !== request.user.id && request.user.role !== 'admin') {
+      return reply.code(403).send({ error: 'Not authorized' });
+    }
 
     const version = body.version ?? agent.currentVersion;
     const versionRecord = await versionRepository.findByAgentVersion(agentId, version);

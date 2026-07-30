@@ -3,7 +3,14 @@ import { db } from '../db/drizzle.js';
 import { agents } from '../db/schema.js';
 
 export class AgentRepository {
-  async list() {
+  async list(createdBy: string) {
+    return db.query.agents.findMany({
+      where: eq(agents.createdBy, createdBy),
+      orderBy: desc(agents.createdAt),
+    });
+  }
+
+  async listAll() {
     return db.query.agents.findMany({ orderBy: desc(agents.createdAt) });
   }
 
