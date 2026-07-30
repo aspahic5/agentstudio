@@ -27,6 +27,7 @@ import { applyContextWindow, type WindowedHistory } from '../contextWindow.js';
 import {
   buildTextChunk,
   buildThinkingChunk,
+  buildWebViewChunk,
 } from '../chunkBuilders.js';
 
 const RESPOND_TO_USER = 'respond_to_user';
@@ -251,6 +252,10 @@ export class ConversationExecutorImpl implements IConversationExecutor {
           : JSON.stringify(stepOutput.parameters.message);
 
         yield buildTextChunk(message);
+
+        if (node.webviewConfig?.html) {
+          yield buildWebViewChunk(node.id, node.webviewConfig.html, node.webviewConfig.css, node.webviewConfig.js);
+        }
 
         convState.responses.push({ turn: turnNumber, userMessage, assistantMessage: message });
         convState.turnCount = turnNumber;

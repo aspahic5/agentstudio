@@ -204,6 +204,8 @@ export default async function sessionRoutes(app: FastifyInstance) {
 
       for await (const chunk of stream) {
         if (abortController.signal.aborted) break;
+        const ext = (chunk as unknown as Record<string, unknown>).custom as Record<string, unknown> | undefined;
+        request.log.info({ chunkType: ext?.extensions ? (ext.extensions as Record<string, unknown>).type : 'text', chunk }, '[Stream] chunk');
         reply.raw.write(`data: ${JSON.stringify(chunk)}\n\n`);
       }
     } catch (err) {

@@ -6,6 +6,7 @@ import { StreamingText } from './streaming-text';
 import { ThinkingIndicator } from './thinking-indicator';
 import { PhaseBadge } from './phase-badge';
 import { ContextCard } from './context-card';
+import { WebViewRenderer } from './webview-renderer';
 import { ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -14,9 +15,10 @@ interface MessageListProps {
   streamingContent: string;
   thinkingState: ThinkingState | null;
   isStreaming: boolean;
+  onWebViewSubmit?: (data: Record<string, unknown>) => void;
 }
 
-export function MessageList({ timeline, streamingContent, thinkingState, isStreaming }: MessageListProps) {
+export function MessageList({ timeline, streamingContent, thinkingState, isStreaming, onWebViewSubmit }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -58,9 +60,12 @@ export function MessageList({ timeline, streamingContent, thinkingState, isStrea
             return <ContextCard key={entry.id} cardType={entry.cardType} data={entry.data} />;
           case 'webview':
             return (
-              <div key={entry.id} className="text-xs text-ink-muted bg-bg-card rounded-lg p-3">
-                [WebView: {entry.content.nodeId}]
-              </div>
+              <WebViewRenderer
+                key={entry.id}
+                content={entry.content}
+                onSubmit={onWebViewSubmit}
+                disabled={isStreaming}
+              />
             );
           case 'completed':
             return (
