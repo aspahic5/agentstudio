@@ -64,7 +64,8 @@ export function MessageList({ timeline, streamingContent, thinkingState, isStrea
                 key={entry.id}
                 content={entry.content}
                 onSubmit={onWebViewSubmit}
-                disabled={isStreaming}
+                disabled={isStreaming || !!entry.content.submittedData}
+                submittedData={entry.content.submittedData}
               />
             );
           case 'completed':

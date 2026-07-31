@@ -25,6 +25,7 @@ export interface WebViewContent {
   html: string;
   css?: string;
   js?: string;
+  submittedData?: Record<string, unknown> | null;
 }
 
 export type ParsedStreamEvent =

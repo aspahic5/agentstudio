@@ -161,8 +161,10 @@ class ApiClient {
   }
 
   async getSessionHistory(sessionId: string): Promise<{
-    messages: Array<{ role: 'user' | 'assistant'; content: string }>;
-    webview: { nodeId: string; html: string; css?: string; js?: string } | null;
+    entries: Array<
+      | { type: 'message'; role: 'user' | 'assistant'; content: string }
+      | { type: 'webview'; nodeId: string; html: string; css?: string; js?: string; submittedData: Record<string, unknown> | null }
+    >;
   }> {
     return this.request(`/api/sessions/${encodeURIComponent(sessionId)}/history`);
   }

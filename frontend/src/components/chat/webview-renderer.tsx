@@ -5,9 +5,10 @@ interface WebViewRendererProps {
   content: WebViewContent;
   onSubmit?: (data: Record<string, unknown>) => void;
   disabled?: boolean;
+  submittedData?: Record<string, unknown> | null;
 }
 
-export function WebViewRenderer({ content, onSubmit, disabled }: WebViewRendererProps) {
+export function WebViewRenderer({ content, onSubmit, disabled, submittedData }: WebViewRendererProps) {
   const onSubmitRef = useRef(onSubmit);
   onSubmitRef.current = onSubmit;
   const disabledRef = useRef(disabled);
@@ -35,9 +36,16 @@ export function WebViewRenderer({ content, onSubmit, disabled }: WebViewRenderer
   // The e.source check above ensures we only act on messages from our own iframe.
   const bridgeScript = `window.submit=function(d){window.parent.postMessage({type:'webview-submit',data:d},'*')};`;
 
+  // When the form was already submitted, inject a script that pre-fills all
+  // inputs/selects/textareas with the previously submitted values and disables
+  // every interactive element so the user cannot resubmit.
+  const prefillScript = submittedData
+    ? `(function(){var d=${JSON.stringify(submittedData)};document.querySelectorAll('input,select,textarea').forEach(function(el){if(el.name&&d[el.name]!==undefined){el.value=d[el.name];}el.disabled=true;});document.querySelectorAll('button').forEach(function(b){b.disabled=true;});})();`
+    : '';
+
   const srcdoc = `<!DOCTYPE html>
 <html><head><style>${content.css ?? ''}</style></head>
-<body>${content.html}<script>${bridgeScript}${content.js ?? ''}<\/script></body></html>`;
+<body>${content.html}<script>${bridgeScript}${content.js ?? ''}${prefillScript}<\/script></body></html>`;
 
   return (
     <iframe

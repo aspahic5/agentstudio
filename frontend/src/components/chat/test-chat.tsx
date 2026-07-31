@@ -33,6 +33,7 @@ export function TestChat({ agentId }: TestChatProps) {
     setSession,
     loadHistory,
     addUserMessage,
+    markWebviewSubmitted,
     reset,
   } = useChatStore();
 
@@ -120,10 +121,11 @@ export function TestChat({ agentId }: TestChatProps) {
   }, [addUserMessage, sendMessage]);
 
   const handleWebViewSubmit = useCallback((data: Record<string, unknown>) => {
-    const message = JSON.stringify(data);
-    addUserMessage(message);
-    sendMessage(message);
-  }, [addUserMessage, sendMessage]);
+    // Mark the webview as submitted immediately so it disables in the UI.
+    // Don't add a user bubble — submissions are silent.
+    markWebviewSubmitted(data);
+    sendMessage(JSON.stringify(data));
+  }, [markWebviewSubmitted, sendMessage]);
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
   const conversationActive = isStreaming || timeline.length > 0;

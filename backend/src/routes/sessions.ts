@@ -119,38 +119,111 @@ export default async function sessionRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: 'Not authorized' });
     }
     const snapshot = await snapshotRepository.load(sessionId);
-    if (!snapshot) return reply.send({ messages: [], webview: null });
+    if (!snapshot) return reply.send({ entries: [] });
 
-    const engine = (snapshot.context.data?._engine as Record<string, unknown> | undefined);
-    const conversation = engine?.conversation as Record<string, unknown> | undefined;
-    const responses = (conversation?.responses ?? []) as Array<{
-      turn: number;
-      userMessage: string;
-      assistantMessage: string;
+    // context.conversationHistory has ALL messages across all nodes in order.
+    const convHistory = (snapshot.context.conversationHistory ?? []) as Array<{
+      role: 'user' | 'assistant';
+      content: string;
     }>;
 
-    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
-    for (const r of responses) {
-      if (r.userMessage) messages.push({ role: 'user', content: r.userMessage });
-      messages.push({ role: 'assistant', content: r.assistantMessage });
-    }
+    // Load all nodes for this agent version to find webviewConfigs.
+    const nodeRows = await nodeRepository.findByAgentVersion(session.agentId, session.version);
 
-    // If the current node has a webviewConfig, include it so the frontend can re-render the form
-    let webview: { nodeId: string; html: string; css?: string; js?: string } | null = null;
-    const currentNodeId = snapshot.context.currentNodeId;
-    if (currentNodeId) {
-      const nodeRows = await nodeRepository.findByAgentVersion(session.agentId, session.version);
-      const currentNode = nodeRows.find((n) => n.id === currentNodeId);
-      if (currentNode) {
-        const cfg = (currentNode.configJson ?? {}) as Record<string, unknown>;
-        const webviewConfig = cfg.webviewConfig as { html?: string; css?: string; js?: string } | undefined;
-        if (webviewConfig?.html) {
-          webview = { nodeId: currentNodeId, html: webviewConfig.html, css: webviewConfig.css, js: webviewConfig.js };
-        }
+    // Build a map of outputContextKey → node for nodes that have a webviewConfig.
+    // When the engine transitions out of a conversation node, it stores the submitted
+    // data in context.data[node.outputContextKey]. We use this to find submittedData
+    // for past nodes.
+    type WebviewNodeInfo = {
+      nodeId: string;
+      html: string;
+      css?: string;
+      js?: string;
+      outputContextKey?: string;
+    };
+    const webviewNodes: WebviewNodeInfo[] = [];
+    for (const n of nodeRows) {
+      const cfg = (n.configJson ?? {}) as Record<string, unknown>;
+      const wv = cfg.webviewConfig as { html?: string; css?: string; js?: string } | undefined;
+      if (wv?.html) {
+        webviewNodes.push({
+          nodeId: n.id,
+          html: wv.html,
+          css: wv.css,
+          js: wv.js,
+          outputContextKey: typeof cfg.outputContextKey === 'string' ? cfg.outputContextKey : undefined,
+        });
       }
     }
 
-    return reply.send({ messages, webview });
+    // Build the timeline entries. We walk conversationHistory and after each
+    // assistant message we check if the immediately following user message is a
+    // JSON webview submission. If so, we insert a webview entry between the
+    // assistant message and the (silent) user submission, with submittedData set.
+    // For the current node (no following user message yet), we show the webview
+    // without submittedData if the node still has a webviewConfig.
+    type HistoryEntry =
+      | { type: 'message'; role: 'user' | 'assistant'; content: string }
+      | { type: 'webview'; nodeId: string; html: string; css?: string; js?: string; submittedData: Record<string, unknown> | null };
+
+    const entries: HistoryEntry[] = [];
+    const contextData = snapshot.context.data ?? {};
+    const currentNodeId = snapshot.context.currentNodeId;
+
+    // Track which webview nodes have been "consumed" (matched to a submission)
+    // so we assign each webview entry to the right node in order.
+    let webviewNodeIndex = 0;
+
+    for (let i = 0; i < convHistory.length; i++) {
+      const msg = convHistory[i];
+
+      if (msg.role === 'assistant') {
+        entries.push({ type: 'message', role: 'assistant', content: msg.content });
+
+        // Peek at the next message — if it's a JSON user submission from a webview,
+        // inject the webview entry here (after the assistant message, before next turn).
+        const next = convHistory[i + 1];
+        if (next?.role === 'user') {
+          let submittedData: Record<string, unknown> | null = null;
+          try {
+            const parsed = JSON.parse(next.content);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              submittedData = parsed as Record<string, unknown>;
+            }
+          } catch {
+            // plain text user message — not a webview submission
+          }
+
+          if (submittedData !== null && webviewNodeIndex < webviewNodes.length) {
+            const wvNode = webviewNodes[webviewNodeIndex];
+            entries.push({ type: 'webview', ...wvNode, submittedData });
+            webviewNodeIndex++;
+            // Skip the user message — it's a silent webview submission, don't show it as a bubble
+            i++;
+          } else {
+            // Regular user text message — will be pushed on next iteration
+          }
+        }
+      } else {
+        // Regular (non-webview) user message
+        entries.push({ type: 'message', role: 'user', content: msg.content });
+      }
+    }
+
+    // If the current node has a webviewConfig and hasn't been submitted yet,
+    // append it at the end so the user can still interact with it.
+    if (currentNodeId && webviewNodeIndex < webviewNodes.length) {
+      const currentNode = webviewNodes.find((n) => n.nodeId === currentNodeId);
+      if (currentNode) {
+        // Check if this node's output is already in context (submitted in a previous session load)
+        const alreadySubmitted = currentNode.outputContextKey
+          ? (contextData[currentNode.outputContextKey] as Record<string, unknown> | undefined) ?? null
+          : null;
+        entries.push({ type: 'webview', ...currentNode, submittedData: alreadySubmitted });
+      }
+    }
+
+    return reply.send({ entries });
   });
 
   app.delete('/sessions/:sessionId', async (request, reply) => {

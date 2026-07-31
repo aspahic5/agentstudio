@@ -23,6 +23,7 @@ interface ChatState {
   startStream: () => void;
   endStream: () => void;
   addUserMessage: (content: string) => void;
+  markWebviewSubmitted: (data: Record<string, unknown>) => void;
   setSession: (sessionId: string, agentId: string) => void;
   loadHistory: (sessionId: string) => Promise<void>;
   reset: () => void;
@@ -305,6 +306,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
+  markWebviewSubmitted: (data: Record<string, unknown>) => {
+    const state = get();
+    // Find the last webview entry and stamp it with submittedData so it
+    // renders as disabled/pre-filled immediately after the user submits.
+    const timeline = state.timeline.map((entry) => {
+      if (entry.type === 'webview' && !entry.content.submittedData) {
+        return {
+          ...entry,
+          content: { ...entry.content, submittedData: data },
+        };
+      }
+      return entry;
+    });
+    set({ timeline });
+  },
+
   setSession: (sessionId: string, agentId: string) => {
     set({
       sessionId,
@@ -324,25 +341,33 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   loadHistory: async (sessionId: string) => {
-    const { messages, webview } = await apiClient.getSessionHistory(sessionId);
-    if (messages.length === 0) return;
-    const timeline: ChatEntry[] = messages.map((m) => ({
-      type: 'message' as const,
-      message: {
-        id: genId(),
-        role: m.role,
-        content: m.content,
-        timestamp: Date.now(),
-      },
-    }));
-    if (webview) {
-      timeline.push({
-        type: 'webview',
-        id: genId(),
-        content: webview,
-        timestamp: Date.now(),
-      });
-    }
+    const { entries } = await apiClient.getSessionHistory(sessionId);
+    if (entries.length === 0) return;
+    const timeline: ChatEntry[] = entries.map((entry) => {
+      if (entry.type === 'webview') {
+        return {
+          type: 'webview' as const,
+          id: genId(),
+          content: {
+            nodeId: entry.nodeId,
+            html: entry.html,
+            css: entry.css,
+            js: entry.js,
+            submittedData: entry.submittedData,
+          },
+          timestamp: Date.now(),
+        };
+      }
+      return {
+        type: 'message' as const,
+        message: {
+          id: genId(),
+          role: entry.role,
+          content: entry.content,
+          timestamp: Date.now(),
+        },
+      };
+    });
     set({ timeline });
   },
 
