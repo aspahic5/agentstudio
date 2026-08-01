@@ -226,6 +226,24 @@ export default async function sessionRoutes(app: FastifyInstance) {
     return reply.send({ entries });
   });
 
+  app.get('/sessions/:sessionId/context', async (request, reply) => {
+    const { sessionId } = request.params as { sessionId: string };
+    const session = await sessionRepository.findById(sessionId);
+    if (!session) return reply.code(404).send({ error: 'Session not found' });
+    if (session.userId !== request.user.id) {
+      return reply.code(403).send({ error: 'Not authorized' });
+    }
+    const snapshot = await snapshotRepository.load(sessionId);
+    if (!snapshot) return reply.code(404).send({ error: 'No snapshot yet' });
+
+    const { _engine, _agentId, _reasoning, ...publicData } = (snapshot.context.data ?? {}) as Record<string, unknown>;
+    return reply.send({
+      currentNodeId: snapshot.context.currentNodeId,
+      data: publicData,
+      internals: { _engine, _agentId, _reasoning },
+    });
+  });
+
   app.patch('/sessions/:sessionId/label', async (request, reply) => {
     const { sessionId } = request.params as { sessionId: string };
     const session = await sessionRepository.findById(sessionId);

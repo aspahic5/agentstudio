@@ -167,6 +167,14 @@ class ApiClient {
     });
   }
 
+  async getSessionContext(sessionId: string): Promise<{
+    currentNodeId: string;
+    data: Record<string, unknown>;
+    internals: Record<string, unknown>;
+  }> {
+    return this.request(`/api/sessions/${encodeURIComponent(sessionId)}/context`);
+  }
+
   async getSessionHistory(sessionId: string): Promise<{
     entries: Array<
       | { type: 'message'; role: 'user' | 'assistant'; content: string }

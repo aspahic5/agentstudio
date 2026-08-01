@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useSessionStore } from '@/stores/session-store';
 import { useChatStore } from '@/stores/chat-store';
 import { useSSEStream } from '@/hooks/use-sse-stream';
@@ -6,6 +6,7 @@ import { SessionControls } from './session-controls';
 import { MessageList } from './message-list';
 import { ChatInput } from './chat-input';
 import { OptionsSelector } from './options-selector';
+import { ContextInspector } from './context-inspector';
 
 // Prevents StrictMode double-invocation from creating two sessions.
 const initializingAgents = new Set<string>();
@@ -15,6 +16,8 @@ interface TestChatProps {
 }
 
 export function TestChat({ agentId }: TestChatProps) {
+  const [contextRefreshTrigger, setContextRefreshTrigger] = useState(0);
+
   const {
     sessions,
     activeSessionId,
@@ -67,11 +70,12 @@ export function TestChat({ agentId }: TestChatProps) {
     init().finally(() => initializingAgents.delete(agentId));
   }, [agentId, fetchSessions, createSession, setActiveSession, setSession, loadHistory]);
 
-  // Refresh session list after stream ends so hasSnapshot reflects reality.
+  // Refresh session list and context inspector after stream ends.
   const prevIsStreamingRef = useRef(false);
   useEffect(() => {
     if (prevIsStreamingRef.current && !isStreaming) {
       fetchSessions(agentId);
+      setContextRefreshTrigger((n) => n + 1);
     }
     prevIsStreamingRef.current = isStreaming;
   }, [isStreaming, agentId, fetchSessions]);
@@ -181,6 +185,8 @@ export function TestChat({ agentId }: TestChatProps) {
           onSubmit={handleOptionSubmit}
         />
       )}
+
+      <ContextInspector sessionId={activeSessionId} refreshTrigger={contextRefreshTrigger} />
 
       <ChatInput
         onSend={handleSendMessage}
