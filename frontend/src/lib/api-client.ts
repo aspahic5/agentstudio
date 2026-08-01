@@ -221,6 +221,18 @@ class ApiClient {
     });
   }
 
+  async suggestWebview(body: {
+    instruction: string;
+    currentHtml?: string;
+    currentCss?: string;
+    currentJs?: string;
+  }): Promise<{ html: string; css: string; js: string; summary: string }> {
+    return this.request('/api/ai-editor/webview-suggest', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
   // Tool definitions
   async getToolDefinitions(): Promise<ToolDefinition[]> {
     return this.request('/api/tools');

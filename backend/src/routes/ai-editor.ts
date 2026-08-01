@@ -7,7 +7,8 @@ import { createStructuredLLMClient } from '../engine/llm/client.js';
 import { validateAgentGraph } from '../engine/validateAgent.js';
 import type { AgentNode } from '../engine/types.js';
 import { suggestRequestSchema, llmResponseSchema, applyOperations } from './ai-editor-operations.js';
-import { buildEditorSystemPrompt } from './ai-editor-prompt.js';
+import { buildEditorSystemPrompt, buildWebviewSystemPrompt } from './ai-editor-prompt.js';
+import { z } from 'zod';
 
 interface NodeData {
   id: string;
@@ -184,5 +185,57 @@ export default async function aiEditorRoutes(app: FastifyInstance) {
         { role: 'assistant', content: result.data.summary },
       ],
     };
+  });
+
+  const webviewSuggestSchema = z.object({
+    instruction: z.string().min(1),
+    currentHtml: z.string().optional(),
+    currentCss: z.string().optional(),
+    currentJs: z.string().optional(),
+  });
+
+  const webviewResponseSchema = z.object({
+    html: z.string(),
+    css: z.string(),
+    js: z.string(),
+    summary: z.string(),
+  });
+
+  app.post('/webview-suggest', async (request, reply) => {
+    const body = parseBody(webviewSuggestSchema, request.body);
+
+    const provider = new LiteLLMService({
+      baseUrl: config.LITELLM_BASE_URL,
+      model: 'studio-editor',
+      logger: request.log,
+    });
+
+    const client = createStructuredLLMClient({ provider, retry: { maxAttempts: 3 } });
+
+    const userContent = [
+      body.currentHtml ? `## Current HTML\n${body.currentHtml}` : null,
+      body.currentCss ? `## Current CSS\n${body.currentCss}` : null,
+      body.currentJs ? `## Current JS\n${body.currentJs}` : null,
+      `## Instruction\n${body.instruction}`,
+    ].filter(Boolean).join('\n\n');
+
+    const result = await client.generate({
+      schema: webviewResponseSchema,
+      messages: [
+        { role: 'system', content: buildWebviewSystemPrompt() },
+        { role: 'user', content: userContent },
+      ],
+      options: { temperature: 0.4, maxTokens: 4096 },
+      originalInput: body.instruction,
+    });
+
+    if (!result.success || !result.data) {
+      return reply.code(422).send({
+        error: 'AI failed to generate webview form',
+        details: result.error?.message,
+      });
+    }
+
+    return result.data;
   });
 }

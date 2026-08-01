@@ -2,7 +2,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { NodeSelector } from './node-selector';
+import { WebviewAIAssistant } from './webview-ai-assistant';
 
 interface ConversationConfigProps {
   nodeId: string;
@@ -19,9 +21,24 @@ export function ConversationConfig({ nodeId, config, onChange }: ConversationCon
   const availableTools = (config.availableTools as string[]) ?? [];
   const reEntryContextKey = (config.reEntryContextKey as string) ?? '';
   const outputSchema = config.outputSchema as Record<string, unknown> | undefined;
+  const webviewConfig = config.webviewConfig as { html?: string; css?: string; js?: string } | undefined;
+  const webviewEnabled = !!webviewConfig;
 
   function update(key: string, value: unknown) {
     onChange({ ...config, [key]: value });
+  }
+
+  function toggleWebview() {
+    if (webviewEnabled) {
+      const { webviewConfig: _wv, ...rest } = config;
+      onChange(rest);
+    } else {
+      onChange({ ...config, webviewConfig: { html: '', css: '', js: '' } });
+    }
+  }
+
+  function updateWebview(key: string, value: string) {
+    onChange({ ...config, webviewConfig: { ...(webviewConfig ?? {}), [key]: value } });
   }
 
   return (
@@ -106,6 +123,60 @@ export function ConversationConfig({ nodeId, config, onChange }: ConversationCon
           placeholder="Optional"
           className="h-8 text-sm"
         />
+      </div>
+
+      {/* WebView Form section */}
+      <div className="border-t border-border-light pt-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <Label className="text-xs font-medium">WebView Form</Label>
+            <p className="text-[10px] text-ink-muted mt-0.5">Custom HTML form shown in chat</p>
+          </div>
+          <Switch checked={webviewEnabled} onCheckedChange={toggleWebview} />
+        </div>
+
+        {webviewEnabled && (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">HTML</Label>
+              <Textarea
+                value={webviewConfig?.html ?? ''}
+                onChange={(e) => updateWebview('html', e.target.value)}
+                placeholder={'<form id="myForm">\n  <input name="value" />\n  <button type="submit">Submit</button>\n</form>'}
+                className="text-sm font-mono min-h-[120px]"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">CSS <span className="text-ink-muted font-normal">(optional)</span></Label>
+              <Textarea
+                value={webviewConfig?.css ?? ''}
+                onChange={(e) => updateWebview('css', e.target.value)}
+                placeholder="form { font-family: sans-serif; padding: 12px; }"
+                className="text-sm font-mono min-h-[60px]"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">JS <span className="text-ink-muted font-normal">(optional)</span></Label>
+              <Textarea
+                value={webviewConfig?.js ?? ''}
+                onChange={(e) => updateWebview('js', e.target.value)}
+                placeholder={'document.getElementById(\'myForm\').addEventListener(\'submit\', function(e) {\n  e.preventDefault();\n  var data = Object.fromEntries(new FormData(e.target));\n  window.submit(data);\n});'}
+                className="text-sm font-mono min-h-[80px]"
+              />
+            </div>
+
+            <WebviewAIAssistant
+              currentHtml={webviewConfig?.html}
+              currentCss={webviewConfig?.css}
+              currentJs={webviewConfig?.js}
+              onApply={(html, css, js) => {
+                onChange({ ...config, webviewConfig: { html, css, js } });
+              }}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
