@@ -61,6 +61,11 @@ interface FlowState {
   closeAgentSettings: () => void;
   updateAgentSettings: (updates: { initialNodeId?: string; description?: string }) => Promise<void>;
 
+  // Test chat panel
+  testChatOpen: boolean;
+  openTestChat: () => void;
+  closeTestChat: () => void;
+
   // Actions — SA config management
   updateSaConfig: (configId: string, updates: Partial<EditorSaConfig>) => void;
   addSaConfig: (nodeId: string) => string;
@@ -116,6 +121,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   isLoading: false,
   isSaving: false,
   error: null,
+  testChatOpen: false,
 
   loadAgent: async (agentId: string) => {
     set({ isLoading: true, error: null, agentId });
@@ -403,6 +409,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   closeAgentSettings: () => set({ agentSettingsOpen: false }),
+
+  openTestChat: () => set({ testChatOpen: true }),
+  closeTestChat: () => set({ testChatOpen: false }),
 
   updateAgentSettings: async (updates) => {
     const { agentId, agent } = get();
@@ -695,6 +704,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       rfEdges: [],
       selectedNodeId: null,
       agentSettingsOpen: false,
+      testChatOpen: false,
       isDirty: false,
       isLoading: false,
       isSaving: false,

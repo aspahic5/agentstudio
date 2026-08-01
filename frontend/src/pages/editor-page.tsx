@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useParams } from 'react-router';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useFlowStore } from '@/stores/flow-store';
@@ -13,7 +13,6 @@ import { AgentSettingsPanel } from '@/components/editor/agent-settings-panel';
 
 export function EditorPage() {
   const { agentId } = useParams<{ agentId: string }>();
-  const [testChatOpen, setTestChatOpen] = useState(false);
   const loadAgent = useFlowStore((s) => s.loadAgent);
   const reset = useFlowStore((s) => s.reset);
   const isLoading = useFlowStore((s) => s.isLoading);
@@ -23,8 +22,17 @@ export function EditorPage() {
   const isDirty = useFlowStore((s) => s.isDirty);
   const agentNodes = useFlowStore((s) => s.agentNodes);
   const saConfigs = useFlowStore((s) => s.saConfigs);
+  const testChatOpen = useFlowStore((s) => s.testChatOpen);
+  const closeTestChat = useFlowStore((s) => s.closeTestChat);
   const aiEditorOpen = useAIEditorStore((s) => s.isOpen);
   const agentSettingsOpen = useFlowStore((s) => s.agentSettingsOpen);
+
+  // Stable draft payload — only recomputed when isDirty changes (not on every render)
+  const draftPayload = useMemo(
+    () => isDirty ? { nodes: Array.from(agentNodes.values()), saConfigs: Array.from(saConfigs.values()) } : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isDirty],
+  );
 
   useEffect(() => {
     if (agentId) {
@@ -66,8 +74,8 @@ export function EditorPage() {
       {testChatOpen && agentId && (
         <EditorTestChat
           agentId={agentId}
-          onClose={() => setTestChatOpen(false)}
-          draftPayload={isDirty ? { nodes: Array.from(agentNodes.values()), saConfigs: Array.from(saConfigs.values()) } : null}
+          onClose={closeTestChat}
+          draftPayload={draftPayload}
         />
       )}
     </div>

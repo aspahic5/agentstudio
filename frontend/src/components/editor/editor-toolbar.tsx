@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, Save, ChevronDown, Sparkles, Settings } from 'lucide-react';
+import { ArrowLeft, Save, ChevronDown, Sparkles, Settings, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,6 +33,10 @@ export function EditorToolbar() {
   const agentSettingsOpen = useFlowStore((s) => s.agentSettingsOpen);
   const openAgentSettings = useFlowStore((s) => s.openAgentSettings);
   const closeAgentSettings = useFlowStore((s) => s.closeAgentSettings);
+
+  const testChatOpen = useFlowStore((s) => s.testChatOpen);
+  const openTestChat = useFlowStore((s) => s.openTestChat);
+  const closeTestChat = useFlowStore((s) => s.closeTestChat);
 
   const [versionPanelOpen, setVersionPanelOpen] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -107,6 +111,17 @@ export function EditorToolbar() {
         )}
 
         <div className="flex-1" />
+
+        {/* Test Chat */}
+        <Button
+          size="sm"
+          variant={testChatOpen ? 'default' : 'ghost'}
+          onClick={() => (testChatOpen ? closeTestChat() : openTestChat())}
+          className={cn(testChatOpen && 'bg-primary text-white')}
+        >
+          <MessageSquare size={14} className="mr-1.5" />
+          Test
+        </Button>
 
         {/* Agent Settings */}
         <Button

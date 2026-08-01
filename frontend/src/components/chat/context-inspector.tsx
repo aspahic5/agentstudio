@@ -70,8 +70,9 @@ export function ContextInspector({ sessionId, refreshTrigger }: ContextInspector
       setContext(data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load context';
-      // 404 = no snapshot yet, show nothing
-      if (!msg.includes('404') && !(err as { status?: number }).status) {
+      // 404 = no snapshot yet, show nothing silently
+      const status = (err as { status?: number }).status;
+      if (status !== 404 && !msg.includes('No snapshot yet')) {
         setError(msg);
       }
     } finally {
