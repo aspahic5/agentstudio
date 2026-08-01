@@ -8,6 +8,7 @@ interface SessionState {
   isLoading: boolean;
   fetchSessions: (agentId: string) => Promise<void>;
   createSession: (agentId: string, version?: string) => Promise<Session>;
+  createDraftSession: (agentId: string, payload: { nodes: unknown[]; saConfigs: unknown[] }) => Promise<Session>;
   deleteSession: (sessionId: string) => Promise<void>;
   updateSessionLabel: (sessionId: string, label: string) => Promise<void>;
   setActiveSession: (sessionId: string) => void;
@@ -30,6 +31,15 @@ export const useSessionStore = create<SessionState>((set) => ({
 
   createSession: async (agentId, version) => {
     const session = await apiClient.createSession(agentId, version);
+    set((s) => ({
+      sessions: [session, ...s.sessions],
+      activeSessionId: session.id,
+    }));
+    return session;
+  },
+
+  createDraftSession: async (agentId, payload) => {
+    const session = await apiClient.createDraftSession(agentId, payload);
     set((s) => ({
       sessions: [session, ...s.sessions],
       activeSessionId: session.id,

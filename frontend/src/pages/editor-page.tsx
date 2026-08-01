@@ -20,6 +20,9 @@ export function EditorPage() {
   const error = useFlowStore((s) => s.error);
   const agent = useFlowStore((s) => s.agent);
   const selectedNodeId = useFlowStore((s) => s.selectedNodeId);
+  const isDirty = useFlowStore((s) => s.isDirty);
+  const agentNodes = useFlowStore((s) => s.agentNodes);
+  const saConfigs = useFlowStore((s) => s.saConfigs);
   const aiEditorOpen = useAIEditorStore((s) => s.isOpen);
   const agentSettingsOpen = useFlowStore((s) => s.agentSettingsOpen);
 
@@ -61,7 +64,11 @@ export function EditorPage() {
       {aiEditorOpen && <AIEditorPanel />}
       {agentSettingsOpen && <AgentSettingsPanel />}
       {testChatOpen && agentId && (
-        <EditorTestChat agentId={agentId} onClose={() => setTestChatOpen(false)} />
+        <EditorTestChat
+          agentId={agentId}
+          onClose={() => setTestChatOpen(false)}
+          draftPayload={isDirty ? { nodes: Array.from(agentNodes.values()), saConfigs: Array.from(saConfigs.values()) } : null}
+        />
       )}
     </div>
   );

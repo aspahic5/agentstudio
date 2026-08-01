@@ -71,6 +71,39 @@ const createSessionSchema = z.object({
   version: z.string().regex(SEMVER_RE, 'Version must be semver (e.g. 1.0.0)').optional(),
 });
 
+const draftNodeSchema = z.object({
+  id: z.string().min(1).max(200),
+  name: z.string().min(1).max(200),
+  nodeType: z.string().min(1).max(100),
+  semanticAgentConfigId: z.string().max(200).nullable().optional(),
+  phaseLabel: z.string().max(200).optional(),
+  progressWeight: z.number().int().optional(),
+  configJson: z.unknown().optional(),
+  positionX: z.number().optional(),
+  positionY: z.number().optional(),
+});
+
+const draftSaConfigSchema = z.object({
+  id: z.string().min(1).max(200),
+  nodeId: z.string().min(1).max(200),
+  name: z.string().min(1).max(200),
+  systemPrompt: z.string().max(100_000),
+  outputSchemaJson: z.unknown().optional(),
+  maxRetries: z.number().int().optional(),
+  temperature: z.number().optional(),
+  maxOutputTokens: z.number().int().nullable().optional(),
+  outputFormatting: z.string().max(50).optional(),
+  outputDensity: z.string().max(50).optional(),
+  reasoningFormatting: z.string().max(50).optional(),
+  thinkingGuidance: z.string().max(10_000).nullable().optional(),
+  modelAlias: z.string().max(100).nullable().optional(),
+});
+
+const createDraftSessionSchema = z.object({
+  nodes: z.array(draftNodeSchema).max(500),
+  saConfigs: z.array(draftSaConfigSchema).max(500),
+});
+
 const messageSchema = z.object({
   message: z.string().nullable(),
   initialContext: z.record(z.string(), z.unknown()).optional(),
@@ -99,6 +132,28 @@ export default async function sessionRoutes(app: FastifyInstance) {
     const session = await sessionRepository.create({
       agentId,
       version,
+      userId: request.user.id,
+    });
+    return reply.code(201).send(session);
+  });
+
+  app.post('/agents/:agentId/sessions/draft', async (request, reply) => {
+    const { agentId } = request.params as { agentId: string };
+    const agent = await agentRepository.findById(agentId);
+    if (!agent) return reply.code(404).send({ error: 'Agent not found' });
+
+    if (agent.createdBy !== request.user.id && request.user.role !== 'admin') {
+      return reply.code(403).send({ error: 'Not authorized' });
+    }
+
+    const body = parseBody(createDraftSessionSchema, request.body);
+    const draftVersion = `draft-${Date.now()}`;
+
+    await versionRepository.saveDraftVersion(agentId, draftVersion, body.nodes, body.saConfigs);
+
+    const session = await sessionRepository.create({
+      agentId,
+      version: draftVersion,
       userId: request.user.id,
     });
     return reply.code(201).send(session);
@@ -263,7 +318,11 @@ export default async function sessionRoutes(app: FastifyInstance) {
     if (session.userId !== request.user.id) {
       return reply.code(403).send({ error: 'Not authorized' });
     }
+    const draftVersion = session.version.startsWith('draft-') ? session.version : null;
     await sessionRepository.delete(sessionId);
+    if (draftVersion) {
+      await versionRepository.deleteDraft(session.agentId, draftVersion).catch(() => {});
+    }
     return reply.code(204).send();
   });
 

@@ -152,6 +152,13 @@ class ApiClient {
     });
   }
 
+  async createDraftSession(agentId: string, payload: { nodes: unknown[]; saConfigs: unknown[] }): Promise<Session> {
+    return this.request(`/api/agents/${encodeURIComponent(agentId)}/sessions/draft`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   async getSessions(agentId: string): Promise<Session[]> {
     return this.request(`/api/agents/${encodeURIComponent(agentId)}/sessions`);
   }

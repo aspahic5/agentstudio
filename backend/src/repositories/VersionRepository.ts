@@ -1,4 +1,4 @@
-import { and, eq, desc } from 'drizzle-orm';
+import { and, eq, desc, not, like } from 'drizzle-orm';
 import { db } from '../db/drizzle.js';
 import { agentVersions, agents } from '../db/schema.js';
 import { nodeRepository } from './NodeRepository.js';
@@ -36,9 +36,21 @@ interface SaConfigPayload {
 
 export class VersionRepository {
   async list(agentId: string) {
-    return db.query.agentVersions.findMany({
-      where: eq(agentVersions.agentId, agentId),
-      orderBy: desc(agentVersions.createdAt),
+    return db
+      .select()
+      .from(agentVersions)
+      .where(and(eq(agentVersions.agentId, agentId), not(like(agentVersions.version, 'draft-%'))))
+      .orderBy(desc(agentVersions.createdAt));
+  }
+
+  async deleteDraft(agentId: string, version: string) {
+    if (!version.startsWith('draft-')) return;
+    await db.transaction(async (tx) => {
+      await saConfigRepository.deleteByAgentVersion(agentId, version, tx);
+      await nodeRepository.deleteByAgentVersion(agentId, version, tx);
+      await tx.delete(agentVersions).where(
+        and(eq(agentVersions.agentId, agentId), eq(agentVersions.version, version)),
+      );
     });
   }
 
@@ -98,6 +110,35 @@ export class VersionRepository {
       }
       throw err;
     }
+  }
+
+  async saveDraftVersion(
+    agentId: string,
+    version: string,
+    nodes: NodePayload[],
+    saConfigs: SaConfigPayload[],
+  ) {
+    const { nodeIdMap, configIdMap } = this.buildIdMaps(nodes, saConfigs);
+
+    await db.transaction(async (tx) => {
+      await tx.insert(agentVersions).values({
+        id: crypto.randomUUID(),
+        agentId,
+        version,
+        label: null,
+      });
+
+      await nodeRepository.bulkInsert(
+        this.remapNodes(nodes, agentId, version, nodeIdMap, configIdMap),
+        tx,
+      );
+
+      await saConfigRepository.bulkInsert(
+        this.remapConfigs(saConfigs, agentId, version, nodeIdMap, configIdMap),
+        tx,
+      );
+      // Draft versions do NOT update agent.currentVersion
+    });
   }
 
   async overwriteVersion(

@@ -13,9 +13,10 @@ const initializingAgents = new Set<string>();
 
 interface TestChatProps {
   agentId: string;
+  draftPayload?: { nodes: unknown[]; saConfigs: unknown[] } | null;
 }
 
-export function TestChat({ agentId }: TestChatProps) {
+export function TestChat({ agentId, draftPayload }: TestChatProps) {
   const [contextRefreshTrigger, setContextRefreshTrigger] = useState(0);
 
   const {
@@ -23,6 +24,7 @@ export function TestChat({ agentId }: TestChatProps) {
     activeSessionId,
     fetchSessions,
     createSession,
+    createDraftSession,
     deleteSession,
     updateSessionLabel,
     setActiveSession,
@@ -51,6 +53,13 @@ export function TestChat({ agentId }: TestChatProps) {
     initializingAgents.add(agentId);
 
     async function init() {
+      // When opened with unsaved changes, always create a fresh draft session.
+      if (draftPayload) {
+        const session = await createDraftSession(agentId, draftPayload);
+        setSession(session.id, agentId);
+        return;
+      }
+
       await fetchSessions(agentId);
       const store = useSessionStore.getState();
 
@@ -68,7 +77,7 @@ export function TestChat({ agentId }: TestChatProps) {
     }
 
     init().finally(() => initializingAgents.delete(agentId));
-  }, [agentId, fetchSessions, createSession, setActiveSession, setSession, loadHistory]);
+  }, [agentId, fetchSessions, createSession, createDraftSession, draftPayload, setActiveSession, setSession, loadHistory]);
 
   // Refresh session list and context inspector after stream ends.
   const prevIsStreamingRef = useRef(false);
@@ -86,9 +95,11 @@ export function TestChat({ agentId }: TestChatProps) {
 
   const handleNewSession = useCallback(async () => {
     reset();
-    const session = await createSession(agentId);
+    const session = draftPayload
+      ? await createDraftSession(agentId, draftPayload)
+      : await createSession(agentId);
     setSession(session.id, agentId);
-  }, [agentId, createSession, setSession, reset]);
+  }, [agentId, createSession, createDraftSession, draftPayload, setSession, reset]);
 
   const handleDeleteSession = useCallback(async (sessionId: string) => {
     reset();
