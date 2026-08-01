@@ -140,6 +140,7 @@ export const sessions = pgTable('sessions', {
   version:   text('version').notNull(),
   userId:    text('user_id').notNull().references(() => users.id),
   status:    text('status').notNull().default('active'),
+  label:     text('label'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [

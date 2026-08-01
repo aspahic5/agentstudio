@@ -31,6 +31,7 @@ export interface Session {
   version: string;
   userId: string;
   status: string;
+  label: string | null;
   createdAt: string;
   updatedAt: string;
   hasSnapshot: boolean;

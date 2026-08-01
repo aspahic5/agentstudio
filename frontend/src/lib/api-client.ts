@@ -160,6 +160,13 @@ class ApiClient {
     return this.request(`/api/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
   }
 
+  async updateSessionLabel(sessionId: string, label: string): Promise<Session> {
+    return this.request(`/api/sessions/${encodeURIComponent(sessionId)}/label`, {
+      method: 'PATCH',
+      body: JSON.stringify({ label }),
+    });
+  }
+
   async getSessionHistory(sessionId: string): Promise<{
     entries: Array<
       | { type: 'message'; role: 'user' | 'assistant'; content: string }

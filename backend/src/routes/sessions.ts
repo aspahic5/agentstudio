@@ -226,6 +226,18 @@ export default async function sessionRoutes(app: FastifyInstance) {
     return reply.send({ entries });
   });
 
+  app.patch('/sessions/:sessionId/label', async (request, reply) => {
+    const { sessionId } = request.params as { sessionId: string };
+    const session = await sessionRepository.findById(sessionId);
+    if (!session) return reply.code(404).send({ error: 'Session not found' });
+    if (session.userId !== request.user.id) {
+      return reply.code(403).send({ error: 'Not authorized' });
+    }
+    const body = parseBody(z.object({ label: z.string().max(80) }), request.body);
+    const updated = await sessionRepository.updateLabel(sessionId, body.label);
+    return reply.send(updated);
+  });
+
   app.delete('/sessions/:sessionId', async (request, reply) => {
     const { sessionId } = request.params as { sessionId: string };
     const session = await sessionRepository.findById(sessionId);

@@ -9,6 +9,7 @@ interface SessionState {
   fetchSessions: (agentId: string) => Promise<void>;
   createSession: (agentId: string, version?: string) => Promise<Session>;
   deleteSession: (sessionId: string) => Promise<void>;
+  updateSessionLabel: (sessionId: string, label: string) => Promise<void>;
   setActiveSession: (sessionId: string) => void;
 }
 
@@ -45,6 +46,13 @@ export const useSessionStore = create<SessionState>((set) => ({
         : s.activeSessionId;
       return { sessions, activeSessionId };
     });
+  },
+
+  updateSessionLabel: async (sessionId, label) => {
+    const updated = await apiClient.updateSessionLabel(sessionId, label);
+    set((s) => ({
+      sessions: s.sessions.map((sess) => sess.id === sessionId ? { ...sess, label: updated.label } : sess),
+    }));
   },
 
   setActiveSession: (sessionId) => set({ activeSessionId: sessionId }),

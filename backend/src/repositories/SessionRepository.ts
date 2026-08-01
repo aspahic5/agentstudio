@@ -26,6 +26,7 @@ export class SessionRepository {
         version: sessions.version,
         userId: sessions.userId,
         status: sessions.status,
+        label: sessions.label,
         createdAt: sessions.createdAt,
         updatedAt: sessions.updatedAt,
         hasSnapshot: sql<boolean>`(EXISTS (
@@ -37,6 +38,15 @@ export class SessionRepository {
       .where(and(eq(sessions.agentId, agentId), eq(sessions.userId, userId)))
       .orderBy(desc(sessions.createdAt));
     return rows;
+  }
+
+  async updateLabel(id: string, label: string) {
+    const [row] = await db
+      .update(sessions)
+      .set({ label, updatedAt: new Date() })
+      .where(eq(sessions.id, id))
+      .returning();
+    return row;
   }
 
   async delete(id: string) {

@@ -21,6 +21,7 @@ export function TestChat({ agentId }: TestChatProps) {
     fetchSessions,
     createSession,
     deleteSession,
+    updateSessionLabel,
     setActiveSession,
   } = useSessionStore();
 
@@ -141,6 +142,7 @@ export function TestChat({ agentId }: TestChatProps) {
         onSelect={handleSelectSession}
         onNew={handleNewSession}
         onDelete={handleDeleteSession}
+        onRename={updateSessionLabel}
       />
 
       <MessageList
