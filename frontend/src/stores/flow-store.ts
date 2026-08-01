@@ -50,6 +50,7 @@ interface FlowState {
 
   // Actions — node management
   addNode: (nodeType: EditorNodeType, position: { x: number; y: number }) => string;
+  duplicateNode: (nodeId: string) => string;
   updateNode: (nodeId: string, updates: Partial<EditorAgentNode>) => void;
   removeNode: (nodeId: string) => void;
   selectNode: (nodeId: string | null) => void;
@@ -300,6 +301,48 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     });
 
     return nodeId;
+  },
+
+  duplicateNode: (nodeId: string) => {
+    const source = get().agentNodes.get(nodeId);
+    if (!source) return '';
+    const newId = crypto.randomUUID();
+
+    const newNode: EditorAgentNode = {
+      ...source,
+      id: newId,
+      name: `${source.name} (copy)`,
+      positionX: (source.positionX ?? 0) + 40,
+      positionY: (source.positionY ?? 0) + 40,
+      semanticAgentConfigId: undefined,
+    };
+
+    const sourceSaConfigs = Array.from(get().saConfigs.values()).filter(
+      (c) => c.nodeId === nodeId,
+    );
+
+    const newSaConfigs: EditorSaConfig[] = sourceSaConfigs.map((c) => {
+      const newSaId = crypto.randomUUID();
+      if (c.id === source.semanticAgentConfigId) {
+        newNode.semanticAgentConfigId = newSaId;
+      }
+      return { ...c, id: newSaId, nodeId: newId };
+    });
+
+    const newAgentNodes = new Map(get().agentNodes);
+    newAgentNodes.set(newId, newNode);
+    const newSaConfigsMap = new Map(get().saConfigs);
+    newSaConfigs.forEach((c) => newSaConfigsMap.set(c.id, c));
+
+    set({
+      agentNodes: newAgentNodes,
+      saConfigs: newSaConfigsMap,
+      rfNodes: buildRfNodes(newAgentNodes, get().selectedNodeId, get().nodeHighlights),
+      rfEdges: deriveEdges(newAgentNodes),
+      isDirty: true,
+    });
+
+    return newId;
   },
 
   updateNode: (nodeId: string, updates: Partial<EditorAgentNode>) => {

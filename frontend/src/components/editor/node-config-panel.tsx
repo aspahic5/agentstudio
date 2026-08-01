@@ -1,4 +1,4 @@
-import { X, Trash2 } from 'lucide-react';
+import { X, Trash2, Copy } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -57,6 +57,7 @@ export function NodeConfigPanel() {
   const updateNode = useFlowStore((s) => s.updateNode);
   const updateSaConfig = useFlowStore((s) => s.updateSaConfig);
   const removeNode = useFlowStore((s) => s.removeNode);
+  const duplicateNode = useFlowStore((s) => s.duplicateNode);
   const selectNode = useFlowStore((s) => s.selectNode);
 
   if (!selectedNodeId) return null;
@@ -83,6 +84,13 @@ export function NodeConfigPanel() {
           <span className="text-sm font-medium text-ink truncate">{node.name}</span>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => duplicateNode(selectedNodeId!)}
+            className="p-1.5 rounded-md text-ink-muted hover:text-primary hover:bg-primary/5"
+            title="Duplicate node"
+          >
+            <Copy size={14} />
+          </button>
           <button
             onClick={() => { removeNode(selectedNodeId!); }}
             className="p-1.5 rounded-md text-ink-muted hover:text-error hover:bg-error/5"
