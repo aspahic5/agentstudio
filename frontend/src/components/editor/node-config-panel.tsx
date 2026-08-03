@@ -16,6 +16,8 @@ import {
   ToolConfig,
   AgenticConfig,
   ComputeConfig,
+  ScreenConfig,
+  InputConfig,
 } from './config-forms';
 import type { EditorNodeType } from '@/types/editor';
 
@@ -47,6 +49,10 @@ function NodeTypeConfigForm({
       return <AgenticConfig nodeId={nodeId} config={config} onChange={onChange} />;
     case 'compute':
       return <ComputeConfig nodeId={nodeId} config={config} onChange={onChange} />;
+    case 'screen':
+      return <ScreenConfig nodeId={nodeId} config={config} onChange={onChange} />;
+    case 'input':
+      return <InputConfig nodeId={nodeId} config={config} onChange={onChange} />;
   }
 }
 

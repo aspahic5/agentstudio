@@ -7,3 +7,5 @@ export { ReviewConfig } from './review-config';
 export { ToolConfig } from './tool-config';
 export { AgenticConfig } from './agentic-config';
 export { ComputeConfig } from './compute-config';
+export { ScreenConfig } from './screen-config';
+export { InputConfig } from './input-config';

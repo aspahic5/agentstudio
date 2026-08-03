@@ -111,6 +111,13 @@ function parseChunk(chunk: EngineChunk): ParsedStreamEvent | null {
     };
   }
 
+  if (ext?.type === 'screen') {
+    return {
+      type: 'screen',
+      content: (ext.content as string) ?? '',
+    };
+  }
+
   if (ext?.type === 'semantic-agent-result') {
     return {
       type: 'semantic-agent-result',

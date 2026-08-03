@@ -186,6 +186,7 @@ class ApiClient {
     entries: Array<
       | { type: 'message'; role: 'user' | 'assistant'; content: string }
       | { type: 'webview'; nodeId: string; html: string; css?: string; js?: string; submittedData: Record<string, unknown> | null }
+      | { type: 'screen'; content: string }
     >;
   }> {
     return this.request(`/api/sessions/${encodeURIComponent(sessionId)}/history`);
@@ -254,6 +255,7 @@ class ApiClient {
     currentHtml?: string;
     currentCss?: string;
     currentJs?: string;
+    nodeContext?: { goalDescription?: string; outputContextKey?: string; outputSchema?: unknown };
   }): Promise<{ html: string; css: string; js: string; summary: string }> {
     return this.request('/api/ai-editor/webview-suggest', {
       method: 'POST',

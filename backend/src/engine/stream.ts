@@ -43,7 +43,8 @@ export interface EngineStreamExtensions {
     | 'pipeline-event'
     | 'turn-complete'
     | 'semantic-agent-result'
-    | 'webview';
+    | 'webview'
+    | 'screen';
 
   nodeId?: string;
 
@@ -78,6 +79,9 @@ export interface EngineStreamExtensions {
   // type: 'semantic-agent-result'
   result?: unknown;
   stateName?: string;
+
+  // type: 'screen'
+  content?: string;
 
   // type: 'webview'
   html?: string;

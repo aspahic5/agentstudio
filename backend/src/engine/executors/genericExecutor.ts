@@ -22,6 +22,8 @@ import { ToolExecutorImpl } from './toolExecutor.js';
 import { AgenticExecutorImpl } from './agenticExecutor.js';
 import { ComputeExecutorImpl } from './computeExecutor.js';
 import { ConversationExecutorImpl } from './conversationExecutor.js';
+import { ScreenExecutorImpl } from './screenExecutor.js';
+import { InputExecutorImpl } from './inputExecutor.js';
 import { ApplicationError } from '../errors.js';
 
 export type EntryResult =
@@ -33,7 +35,7 @@ export type EntryResult =
   | ComputeResult
   | ConversationResult;
 
-export type InputResult = IntentResult | ConversationResult;
+export type InputResult = IntentResult | ConversationResult | RoutingResult;
 
 export class GenericExecutor {
   private readonly intentParsing = new IntentParsingExecutorImpl();
@@ -44,6 +46,8 @@ export class GenericExecutor {
   private readonly agentic = new AgenticExecutorImpl();
   private readonly compute = new ComputeExecutorImpl();
   private readonly conversation = new ConversationExecutorImpl();
+  private readonly screen = new ScreenExecutorImpl();
+  private readonly input = new InputExecutorImpl();
 
   async *executeEntry(
     node: AgentNode,
@@ -70,6 +74,10 @@ export class GenericExecutor {
         return yield* this.compute.execute(node, context, deps);
       case 'conversation':
         return yield* this.conversation.executeEntry(node, context, deps);
+      case 'screen':
+        return yield* this.screen.execute(node, context, deps);
+      case 'input':
+        return yield* this.input.executeEntry(node, context, deps);
     }
   }
 
@@ -86,6 +94,10 @@ export class GenericExecutor {
         return yield* this.review.parseAndModify(node, context, userMessage, deps);
       case 'conversation':
         return yield* this.conversation.executeInput(node, context, userMessage, deps);
+      case 'input':
+        return yield* this.input.executeInput(node, context, userMessage, deps);
+      case 'screen':
+        return yield* this.screen.advance(node, context, deps);
       default:
         throw new ApplicationError(
           `[GenericExecutor] executeInput called on node type "${node.nodeType}" which does not accept user input.`,
@@ -98,7 +110,9 @@ export class GenericExecutor {
     return (
       node.nodeType === 'intent_parsing' ||
       node.nodeType === 'review' ||
-      node.nodeType === 'conversation'
+      node.nodeType === 'conversation' ||
+      node.nodeType === 'input' ||
+      node.nodeType === 'screen'
     );
   }
 

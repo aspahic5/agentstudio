@@ -146,6 +146,11 @@ export function buildSemanticAgentResultChunk(
   });
 }
 
+/** Screen content chunk (auto-advance node with "Dalje" button) */
+export function buildScreenChunk(content: string): EngineStreamChunk {
+  return makeChunk('', null, { type: 'screen', content });
+}
+
 /** WebView content chunk */
 export function buildWebViewChunk(
   nodeId: string,

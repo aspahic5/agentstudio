@@ -1,4 +1,4 @@
-import { GitBranch, Sparkles, Route, ClipboardCheck, Wrench, Bot, Calculator, MessageCircle } from 'lucide-react';
+import { GitBranch, Sparkles, Route, ClipboardCheck, Wrench, Bot, Calculator, MessageCircle, Monitor, ListChecks } from 'lucide-react';
 import type { EditorNodeType } from '@/types/editor';
 
 export const NODE_TYPE_META: Record<EditorNodeType, {
@@ -16,6 +16,8 @@ export const NODE_TYPE_META: Record<EditorNodeType, {
   agentic: { label: 'Agentic', icon: Bot, description: 'Multi-step autonomous agent', accentColor: 'border-l-[#7C3AED]', textColor: 'text-[#7C3AED]' },
   compute: { label: 'Compute', icon: Calculator, description: 'Run computation script', accentColor: 'border-l-ink-light', textColor: 'text-ink-light' },
   conversation: { label: 'Conversation', icon: MessageCircle, description: 'Multi-turn conversation', accentColor: 'border-l-[#0EA5E9]', textColor: 'text-[#0EA5E9]' },
+  screen: { label: 'Screen', icon: Monitor, description: 'Show content to user', accentColor: 'border-l-[#10B981]', textColor: 'text-[#10B981]' },
+  input: { label: 'Input', icon: ListChecks, description: 'Collect user selection', accentColor: 'border-l-[#F59E0B]', textColor: 'text-[#F59E0B]' },
 } as const;
 
 export function nodeTypeNeedsSaConfig(nodeType: EditorNodeType): boolean {
@@ -99,5 +101,9 @@ export function getDefaultConfigJson(nodeType: EditorNodeType): Record<string, u
         maxStepsPerTurn: 5,
         outputSchema: {},
       };
+    case 'screen':
+      return { content: '', targetNodeId: '' };
+    case 'input':
+      return { prompt: '', options: [], outputContextKey: '' };
   }
 }

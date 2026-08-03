@@ -155,6 +155,10 @@ export function TestChat({ agentId, draftPayload }: TestChatProps) {
     sendMessage(JSON.stringify(data));
   }, [markWebviewSubmitted, sendMessage]);
 
+  const handleScreenContinue = useCallback(() => {
+    sendMessage('\u200B');
+  }, [sendMessage]);
+
   const activeSession = sessions.find(s => s.id === activeSessionId);
   const conversationActive = isStreaming || timeline.length > 0;
   const showStartButton = !!activeSession && !activeSession.hasSnapshot && !conversationActive;
@@ -188,6 +192,7 @@ export function TestChat({ agentId, draftPayload }: TestChatProps) {
         thinkingState={thinkingState}
         isStreaming={isStreaming}
         onWebViewSubmit={handleWebViewSubmit}
+        onScreenContinue={handleScreenContinue}
       />
 
       {showStartButton && (

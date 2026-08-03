@@ -225,6 +225,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       case 'agentic':
       case 'compute':
       case 'conversation':
+      case 'screen':
         cfg.targetNodeId = connection.target;
         break;
       case 'intent_parsing':

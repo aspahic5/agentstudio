@@ -131,3 +131,14 @@ h1, h2, h3, h4 {
     @apply font-sans;
   }
 }
+
+/* Strip ReactFlow's default node-type wrapper styles so custom nodes render cleanly */
+.react-flow__node-input,
+.react-flow__node-screen {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  width: auto;
+}

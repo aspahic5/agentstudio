@@ -261,9 +261,12 @@ export class SemanticAgentImpl<TOutput> implements SemanticAgent<TOutput> {
     const messages: Message[] = [];
 
     for (const turn of history) {
+      const content = turn.content.startsWith('__screen__:')
+        ? turn.content.slice('__screen__:'.length)
+        : turn.content;
       messages.push({
         role: turn.role as 'user' | 'assistant' | 'system',
-        content: turn.content,
+        content,
         ...(turn.reasoning_content && { reasoning: turn.reasoning_content }),
       });
     }

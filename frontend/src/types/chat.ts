@@ -20,4 +20,5 @@ export type ChatEntry =
   | { type: 'node-title'; id: string; nodeId: string; title: string; phase: string; description?: string; timestamp: number }
   | { type: 'context-update'; id: string; cardType: string; data: Record<string, unknown>; timestamp: number }
   | { type: 'webview'; id: string; content: WebViewContent; timestamp: number }
+  | { type: 'screen'; id: string; content: string; done: boolean; timestamp: number }
   | { type: 'completed'; id: string; timestamp: number };

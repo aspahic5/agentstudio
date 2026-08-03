@@ -9,6 +9,7 @@ import { nodeRepository } from '../repositories/NodeRepository.js';
 import { toolDefinitionRepository } from '../repositories/ToolDefinitionRepository.js';
 import { processMessage } from '../engine/engineOrchestrator.js';
 import { snapshotRepository } from '../engine/snapshotRepository.js';
+import { interpolate } from '../engine/interpolate.js';
 import { LiteLLMService } from '../engine/llm/liteLLMService.js';
 import { config } from '../config.js';
 import type {
@@ -196,16 +197,26 @@ export default async function sessionRoutes(app: FastifyInstance) {
       js?: string;
       outputContextKey?: string;
     };
+    const flatCtx: Record<string, unknown> = {
+      ...(snapshot.context.data ?? {}),
+      userId: snapshot.context.userId,
+      sessionId: snapshot.context.sessionId,
+    };
+
     const webviewNodes: WebviewNodeInfo[] = [];
     for (const n of nodeRows) {
       const cfg = (n.configJson ?? {}) as Record<string, unknown>;
       const wv = cfg.webviewConfig as { html?: string; css?: string; js?: string } | undefined;
       if (wv?.html) {
+        const interpolatedHtml = interpolate(wv.html, flatCtx);
+        const interpolatedCss = wv.css ? interpolate(wv.css, flatCtx) : undefined;
+        const interpolatedJs = wv.js ? interpolate(wv.js, flatCtx) : undefined;
+        const contextScript = `window.__context__=${JSON.stringify(flatCtx)};`;
         webviewNodes.push({
           nodeId: n.id,
-          html: wv.html,
-          css: wv.css,
-          js: wv.js,
+          html: interpolatedHtml,
+          css: interpolatedCss,
+          js: contextScript + (interpolatedJs ?? ''),
           outputContextKey: typeof cfg.outputContextKey === 'string' ? cfg.outputContextKey : undefined,
         });
       }
@@ -219,10 +230,10 @@ export default async function sessionRoutes(app: FastifyInstance) {
     // without submittedData if the node still has a webviewConfig.
     type HistoryEntry =
       | { type: 'message'; role: 'user' | 'assistant'; content: string }
-      | { type: 'webview'; nodeId: string; html: string; css?: string; js?: string; submittedData: Record<string, unknown> | null };
+      | { type: 'webview'; nodeId: string; html: string; css?: string; js?: string; submittedData: Record<string, unknown> | null }
+      | { type: 'screen'; content: string };
 
     const entries: HistoryEntry[] = [];
-    const contextData = snapshot.context.data ?? {};
     const currentNodeId = snapshot.context.currentNodeId;
 
     // Track which webview nodes have been "consumed" (matched to a submission)
@@ -233,7 +244,12 @@ export default async function sessionRoutes(app: FastifyInstance) {
       const msg = convHistory[i];
 
       if (msg.role === 'assistant') {
-        entries.push({ type: 'message', role: 'assistant', content: msg.content });
+        // Screen entries are stored with a '__screen__:' prefix — emit as screen type.
+        if (msg.content.startsWith('__screen__:')) {
+          entries.push({ type: 'screen', content: msg.content.slice('__screen__:'.length) });
+        } else {
+          entries.push({ type: 'message', role: 'assistant', content: msg.content });
+        }
 
         // Peek at the next message — if it's a JSON user submission from a webview,
         // inject the webview entry here (after the assistant message, before next turn).
@@ -260,8 +276,10 @@ export default async function sessionRoutes(app: FastifyInstance) {
           }
         }
       } else {
-        // Regular (non-webview) user message
-        entries.push({ type: 'message', role: 'user', content: msg.content });
+        // Regular (non-webview) user message — skip silent screen-continue sentinel
+        if (msg.content !== '\u200B') {
+          entries.push({ type: 'message', role: 'user', content: msg.content });
+        }
       }
     }
 
@@ -272,7 +290,7 @@ export default async function sessionRoutes(app: FastifyInstance) {
       if (currentNode) {
         // Check if this node's output is already in context (submitted in a previous session load)
         const alreadySubmitted = currentNode.outputContextKey
-          ? (contextData[currentNode.outputContextKey] as Record<string, unknown> | undefined) ?? null
+          ? (flatCtx[currentNode.outputContextKey] as Record<string, unknown> | undefined) ?? null
           : null;
         entries.push({ type: 'webview', ...currentNode, submittedData: alreadySubmitted });
       }
@@ -339,18 +357,25 @@ export default async function sessionRoutes(app: FastifyInstance) {
     const agent = await agentRepository.findById(session.agentId);
     if (!agent) return reply.code(404).send({ error: 'Agent not found' });
 
-    const nodeRows = await nodeRepository.findByAgentVersion(session.agentId, session.version);
+    const [versionRecord, nodeRows] = await Promise.all([
+      versionRepository.findByAgentVersion(session.agentId, session.version),
+      nodeRepository.findByAgentVersion(session.agentId, session.version),
+    ]);
     const parsedNodes = nodeRows.map(parseNodeRow);
 
     const toolNames = collectToolNames(parsedNodes);
     const toolRows = await toolDefinitionRepository.findByNames(toolNames);
     const toolDefs = new Map(toolRows.map((r) => [r.name, parseToolRow(r)]));
 
+    // Use version-scoped initialNodeId — agent.initialNodeId always points to the
+    // latest version's node UUID which differs from older versions' node UUIDs.
+    const initialNodeId = versionRecord?.initialNodeId ?? agent.initialNodeId ?? parsedNodes[0]?.id ?? '';
+
     const agentDef: AgentDefinition = {
       id: agent.id,
       name: agent.name,
       description: agent.description,
-      initialNodeId: agent.initialNodeId,
+      initialNodeId,
       version: session.version,
       inputContract: agent.inputContract,
       metadata: (agent.metadata ?? {}) as Record<string, unknown>,

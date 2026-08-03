@@ -34,7 +34,8 @@ export function deriveEdges(nodes: Map<string, EditorAgentNode>): FlowEdge[] {
       case 'tool':
       case 'agentic':
       case 'compute':
-      case 'conversation': {
+      case 'conversation':
+      case 'screen': {
         // targetNodeId -> single edge
         const targetNodeId = cfg.targetNodeId as string | undefined;
         if (targetNodeId && nodeIds.has(targetNodeId)) {
@@ -44,6 +45,26 @@ export function deriveEdges(nodes: Map<string, EditorAgentNode>): FlowEdge[] {
             target: targetNodeId,
             type: 'smoothstep',
           });
+        }
+        break;
+      }
+
+      case 'input': {
+        // options[].targetNodeId -> one edge per option (sourceHandle matches handle on node)
+        const options = cfg.options as Array<{ id: string; label: string; targetNodeId: string }> | undefined;
+        if (options) {
+          for (const option of options) {
+            if (option.targetNodeId && nodeIds.has(option.targetNodeId)) {
+              edges.push({
+                id: `e-${counter++}`,
+                source: node.id,
+                target: option.targetNodeId,
+                sourceHandle: `option-${option.id ?? option.label}`,
+                type: 'smoothstep',
+                label: option.label,
+              });
+            }
+          }
         }
         break;
       }

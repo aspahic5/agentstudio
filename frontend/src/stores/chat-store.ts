@@ -175,6 +175,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
         break;
       }
 
+      case 'screen': {
+        set({
+          timeline: [
+            ...state.timeline,
+            { type: 'screen', id: genId(), content: event.content, done: false, timestamp: Date.now() },
+          ],
+        });
+        break;
+      }
+
       case 'webview': {
         set({
           webviewContent: event.content,
@@ -184,8 +194,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       case 'turn-complete': {
-        // Finalize streaming text into assistant message
-        let timeline = state.timeline;
+        // Mark the last screen entry as done (enables "Dalje" button)
+        let timeline = state.timeline.map((entry) =>
+          entry.type === 'screen' && !entry.done ? { ...entry, done: true } : entry
+        );
         let pendingOpts = state.pendingOptions;
         const pendingWv = state.pendingWebview;
         if (state.streamingContent) {
@@ -343,9 +355,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadHistory: async (sessionId: string) => {
     const { entries } = await apiClient.getSessionHistory(sessionId);
     if (entries.length === 0) return;
-    const timeline: ChatEntry[] = entries.map((entry) => {
+    const timeline: ChatEntry[] = entries.flatMap((entry) => {
       if (entry.type === 'webview') {
-        return {
+        return [{
           type: 'webview' as const,
           id: genId(),
           content: {
@@ -356,9 +368,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
             submittedData: entry.submittedData,
           },
           timestamp: Date.now(),
-        };
+        }];
       }
-      return {
+      if (entry.type === 'screen') {
+        return [{
+          type: 'screen' as const,
+          id: genId(),
+          content: entry.content,
+          done: true,
+          timestamp: Date.now(),
+        }];
+      }
+      // Skip silent screen-continue messages (zero-width space sentinel)
+      if (entry.role === 'user' && entry.content === '\u200B') return [];
+      return [{
         type: 'message' as const,
         message: {
           id: genId(),
@@ -366,7 +389,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           content: entry.content,
           timestamp: Date.now(),
         },
-      };
+      }];
     });
     set({ timeline });
   },

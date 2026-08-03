@@ -7,6 +7,8 @@ import { ToolNode } from './tool-node';
 import { AgenticNode } from './agentic-node';
 import { ComputeNode } from './compute-node';
 import { ConversationNode } from './conversation-node';
+import { ScreenNode } from './screen-node';
+import { InputNode } from './input-node';
 
 export const nodeTypes: NodeTypes = {
   intent_parsing: IntentParsingNode,
@@ -17,4 +19,6 @@ export const nodeTypes: NodeTypes = {
   agentic: AgenticNode,
   compute: ComputeNode,
   conversation: ConversationNode,
+  screen: ScreenNode,
+  input: InputNode,
 };

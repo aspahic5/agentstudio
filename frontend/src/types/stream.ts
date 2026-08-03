@@ -40,6 +40,7 @@ export type ParsedStreamEvent =
   | { type: 'context-update'; cardType: string; data: Record<string, unknown> }
   | { type: 'turn-complete'; isComplete: boolean; currentNodeId: string; contextData?: Record<string, unknown> }
   | { type: 'webview'; content: WebViewContent }
+  | { type: 'screen'; content: string }
   | { type: 'semantic-agent-result'; result: unknown; stateName: string }
   | { type: 'error'; message: string }
   | { type: 'done' };

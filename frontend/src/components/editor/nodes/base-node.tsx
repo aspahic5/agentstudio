@@ -41,16 +41,18 @@ function BaseNodeInner({ data, children, sourceHandles }: BaseNodeProps) {
       </div>
 
       {sourceHandles && sourceHandles.length > 0 ? (
-        sourceHandles.map((h, i) => (
-          <Handle
-            key={h.id}
-            type="source"
-            position={Position.Bottom}
-            id={h.id}
-            className="!bg-ink-muted !w-2.5 !h-2.5 !border-2 !border-white"
-            style={{ left: `${((i + 1) / (sourceHandles.length + 1)) * 100}%` }}
-          />
-        ))
+        <div className="relative h-4">
+          {sourceHandles.map((h, i) => (
+            <Handle
+              key={h.id}
+              type="source"
+              position={Position.Bottom}
+              id={h.id}
+              className="!bg-ink-muted !w-2.5 !h-2.5 !border-2 !border-white"
+              style={{ left: `${((i + 1) / (sourceHandles.length + 1)) * 100}%` }}
+            />
+          ))}
+        </div>
       ) : (
         <Handle type="source" position={Position.Bottom} className="!bg-ink-muted !w-3 !h-3 !border-2 !border-white" />
       )}
