@@ -167,6 +167,20 @@ export function ConversationConfig({ nodeId, config, onChange }: ConversationCon
               />
             </div>
 
+            {(webviewConfig?.html) && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">Preview</Label>
+                <iframe
+                  key={`${webviewConfig.html}${webviewConfig.css ?? ''}${webviewConfig.js ?? ''}`}
+                  srcDoc={`<!DOCTYPE html><html><head><style>${webviewConfig.css ?? ''}</style></head><body>${webviewConfig.html}<script>window.submit=function(d){};${webviewConfig.js ?? ''}<\/script></body></html>`}
+                  sandbox="allow-scripts allow-forms"
+                  title="WebView Preview"
+                  className="w-full border border-border-light rounded-lg bg-white"
+                  style={{ minHeight: 200 }}
+                />
+              </div>
+            )}
+
             <WebviewAIAssistant
               currentHtml={webviewConfig?.html}
               currentCss={webviewConfig?.css}

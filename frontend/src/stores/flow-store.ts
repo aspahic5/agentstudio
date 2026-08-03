@@ -59,7 +59,7 @@ interface FlowState {
   agentSettingsOpen: boolean;
   openAgentSettings: () => void;
   closeAgentSettings: () => void;
-  updateAgentSettings: (updates: { initialNodeId?: string; description?: string }) => Promise<void>;
+  updateAgentSettings: (updates: { initialNodeId?: string; description?: string; inputContract?: unknown; metadata?: Record<string, unknown> }) => Promise<void>;
 
   // Test chat panel
   testChatOpen: boolean;

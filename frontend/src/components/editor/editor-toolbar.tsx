@@ -118,6 +118,8 @@ export function EditorToolbar() {
           variant={testChatOpen ? 'default' : 'ghost'}
           onClick={() => (testChatOpen ? closeTestChat() : openTestChat())}
           className={cn(testChatOpen && 'bg-primary text-white')}
+          disabled={!activeVersion && !isDirty}
+          title={!activeVersion && !isDirty ? 'Save a version first to test' : undefined}
         >
           <MessageSquare size={14} className="mr-1.5" />
           Test

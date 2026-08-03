@@ -7,6 +7,8 @@ import { MessageList } from './message-list';
 import { ChatInput } from './chat-input';
 import { OptionsSelector } from './options-selector';
 import { ContextInspector } from './context-inspector';
+import { apiClient } from '@/lib/api-client';
+import type { Version } from '@/types/api';
 
 // Prevents StrictMode double-invocation from creating two sessions.
 const initializingAgents = new Set<string>();
@@ -18,6 +20,8 @@ interface TestChatProps {
 
 export function TestChat({ agentId, draftPayload }: TestChatProps) {
   const [contextRefreshTrigger, setContextRefreshTrigger] = useState(0);
+  const [initError, setInitError] = useState<string | null>(null);
+  const [versions, setVersions] = useState<Version[]>([]);
 
   const {
     sessions,
@@ -66,18 +70,26 @@ export function TestChat({ agentId, draftPayload }: TestChatProps) {
       if (store.sessions.length === 0) {
         const session = await createSession(agentId);
         setSession(session.id, agentId);
-      } else if (!store.activeSessionId) {
-        const first = store.sessions[0];
-        setActiveSession(first.id);
-        setSession(first.id, agentId);
-        if (first.hasSnapshot) {
-          await loadHistory(first.id);
+      } else {
+        const activeId = store.activeSessionId ?? store.sessions[0].id;
+        if (!store.activeSessionId) setActiveSession(activeId);
+        setSession(activeId, agentId);
+        const session = store.sessions.find((s) => s.id === activeId);
+        if (session?.hasSnapshot) {
+          await loadHistory(activeId);
         }
       }
     }
 
-    init().finally(() => initializingAgents.delete(agentId));
+    init()
+      .catch((err) => setInitError(err instanceof Error ? err.message : 'Failed to initialize session'))
+      .finally(() => initializingAgents.delete(agentId));
   }, [agentId, fetchSessions, createSession, createDraftSession, draftPayload, setActiveSession, setSession, loadHistory]);
+
+  // Fetch available versions for the version picker.
+  useEffect(() => {
+    apiClient.getVersions(agentId).then(setVersions).catch(() => {});
+  }, [agentId]);
 
   // Refresh session list and context inspector after stream ends.
   const prevIsStreamingRef = useRef(false);
@@ -93,11 +105,11 @@ export function TestChat({ agentId, draftPayload }: TestChatProps) {
     sendMessageRef.current(null);
   }, []);
 
-  const handleNewSession = useCallback(async () => {
+  const handleNewSession = useCallback(async (version?: string) => {
     reset();
     const session = draftPayload
       ? await createDraftSession(agentId, draftPayload)
-      : await createSession(agentId);
+      : await createSession(agentId, version);
     setSession(session.id, agentId);
   }, [agentId, createSession, createDraftSession, draftPayload, setSession, reset]);
 
@@ -149,11 +161,21 @@ export function TestChat({ agentId, draftPayload }: TestChatProps) {
   const showContinueNotice = !!activeSession && activeSession.hasSnapshot && !conversationActive;
 
 
+  if (initError) {
+    return (
+      <div className="flex flex-col h-full items-center justify-center p-6 gap-3">
+        <p className="text-sm text-error text-center">{initError}</p>
+        <p className="text-xs text-ink-muted text-center">Save a version first, then open Test Chat.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       <SessionControls
         sessions={sessions}
         activeSessionId={activeSessionId}
+        versions={versions}
         onSelect={handleSelectSession}
         onNew={handleNewSession}
         onDelete={handleDeleteSession}

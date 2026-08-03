@@ -358,7 +358,7 @@ export default async function sessionRoutes(app: FastifyInstance) {
 
     const provider = new LiteLLMService({
       baseUrl: config.LITELLM_BASE_URL,
-      model: 'gemini-3-pro',
+      model: 'gemini-3-flash',
       logger: request.log,
     });
 

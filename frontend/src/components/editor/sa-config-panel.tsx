@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import type { EditorSaConfig } from '@/types/editor';
+import { apiClient } from '@/lib/api-client';
 
 interface SaConfigPanelProps {
   config: EditorSaConfig;
@@ -10,6 +12,11 @@ interface SaConfigPanelProps {
 }
 
 export function SaConfigPanel({ config, onChange }: SaConfigPanelProps) {
+  const [models, setModels] = useState<string[]>([]);
+  useEffect(() => {
+    apiClient.getModels().then(setModels).catch(() => {});
+  }, []);
+
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
@@ -127,13 +134,19 @@ export function SaConfigPanel({ config, onChange }: SaConfigPanelProps) {
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-xs">Model Alias</Label>
-        <Input
-          value={config.modelAlias ?? ''}
-          onChange={(e) => onChange({ modelAlias: e.target.value || null })}
-          placeholder="Default model"
-          className="h-8 text-sm"
-        />
+        <Label className="text-xs">Model</Label>
+        <Select
+          value={config.modelAlias ?? '__default__'}
+          onValueChange={(v) => onChange({ modelAlias: v === '__default__' ? null : v })}
+        >
+          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__default__">Default</SelectItem>
+            {models.map((m) => (
+              <SelectItem key={m} value={m}>{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

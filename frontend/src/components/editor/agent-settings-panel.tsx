@@ -17,11 +17,19 @@ export function AgentSettingsPanel() {
 
   const [description, setDescription] = useState(agent?.description ?? '');
   const [initialNodeId, setInitialNodeId] = useState(agent?.initialNodeId ?? '');
+  const [inputContractStr, setInputContractStr] = useState(
+    agent?.inputContract ? JSON.stringify(agent.inputContract, null, 2) : ''
+  );
+  const [metadataStr, setMetadataStr] = useState(
+    agent?.metadata && Object.keys(agent.metadata).length > 0 ? JSON.stringify(agent.metadata, null, 2) : ''
+  );
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setDescription(agent?.description ?? '');
     setInitialNodeId(agent?.initialNodeId ?? '');
+    setInputContractStr(agent?.inputContract ? JSON.stringify(agent.inputContract, null, 2) : '');
+    setMetadataStr(agent?.metadata && Object.keys(agent.metadata).length > 0 ? JSON.stringify(agent.metadata, null, 2) : '');
   }, [agent?.id]);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,7 +45,23 @@ export function AgentSettingsPanel() {
     setIsSaving(true);
     setError(null);
     try {
-      await updateAgentSettings({ initialNodeId, description });
+      let inputContract: unknown = undefined;
+      if (inputContractStr.trim()) {
+        try { inputContract = JSON.parse(inputContractStr); } catch {
+          setError('Input Contract is not valid JSON');
+          setIsSaving(false);
+          return;
+        }
+      }
+      let metadata: Record<string, unknown> | undefined = undefined;
+      if (metadataStr.trim()) {
+        try { metadata = JSON.parse(metadataStr) as Record<string, unknown>; } catch {
+          setError('Metadata is not valid JSON');
+          setIsSaving(false);
+          return;
+        }
+      }
+      await updateAgentSettings({ initialNodeId, description, inputContract, metadata });
       closeAgentSettings();
     } catch (err) {
       setError((err as Error).message);
@@ -92,6 +116,27 @@ export function AgentSettingsPanel() {
               </SelectContent>
             </Select>
             <p className="text-[10px] text-ink-muted">The first node executed when a user starts a session</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Input Contract <span className="text-ink-muted font-normal">(JSON, optional)</span></Label>
+            <Textarea
+              value={inputContractStr}
+              onChange={(e) => setInputContractStr(e.target.value)}
+              placeholder={'{\n  "field": "string"\n}'}
+              className="text-sm font-mono min-h-[80px]"
+            />
+            <p className="text-[10px] text-ink-muted">Schema for the initial context passed to this agent</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Metadata <span className="text-ink-muted font-normal">(JSON, optional)</span></Label>
+            <Textarea
+              value={metadataStr}
+              onChange={(e) => setMetadataStr(e.target.value)}
+              placeholder={'{\n  "key": "value"\n}'}
+              className="text-sm font-mono min-h-[60px]"
+            />
           </div>
 
           {error && <p className="text-sm text-error">{error}</p>}

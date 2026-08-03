@@ -38,6 +38,13 @@ app.get('/health', async () => {
   return { status: 'ok', timestamp: new Date().toISOString() };
 });
 
+// Proxy LiteLLM model list so the frontend doesn't need the LiteLLM URL.
+app.get('/api/models', async (_request, reply) => {
+  const res = await fetch(`${config.LITELLM_BASE_URL.replace(/\/$/, '')}/v1/models`);
+  const data = await res.json();
+  return reply.send(data);
+});
+
 await app.register(authRoutes, { prefix: '/api/auth' });
 await app.register(agentRoutes, { prefix: '/api/agents' });
 await app.register(toolRoutes, { prefix: '/api/tools' });

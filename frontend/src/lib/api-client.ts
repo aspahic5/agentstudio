@@ -191,6 +191,12 @@ class ApiClient {
     return this.request(`/api/sessions/${encodeURIComponent(sessionId)}/history`);
   }
 
+  // LiteLLM models
+  async getModels(): Promise<string[]> {
+    const data = await this.request<{ data: { id: string }[] }>('/api/models');
+    return data.data.map((m) => m.id);
+  }
+
   // Versions
   async getVersions(agentId: string): Promise<Version[]> {
     return this.request(`/api/agents/${encodeURIComponent(agentId)}/versions`);
