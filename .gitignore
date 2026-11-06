@@ -1,13 +1,32 @@
 node_modules/
 dist/
+# Secrets — ignore every env variant, keep only the example template
 .env
-.env.local
+.env.*
+*.env
+!.env.example
+*.pem
+*.key
+*.p12
+
+# AI assistant instructions / config — local only
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+AGENT.md
+GEMINI.md
+.claude/
+.cursor/
+.cursorrules
+.codex/
+.gemini/
+.github/copilot-instructions.md
+# AI plugin output (plans, specs written into the repo)
+docs/superpowers/
+
 *.log
 .DS_Store
 *.tsbuildinfo
-
-# Docker
-docker/.env
 
 # IDE
 .vscode/
